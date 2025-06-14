@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { AppState, Building, Part, PartInstallation, ManualPartInstallation, Update, Income, User, AppSettings, FaultReport, MaintenanceReceipt, MaintenanceHistory, Printer, MaintenanceRecord, SMSTemplate, Proposal, ProposalItem, Payment } from '../types';
+import { AppState, Building, Part, PartInstallation, ManualPartInstallation, Update, Income, User, AppSettings, FaultReport, MaintenanceReceipt, MaintenanceHistory, Printer, MaintenanceRecord, SMSTemplate, Proposal, ProposalItem, Payment, DebtRecord, ProposalTemplate, ProposalField } from '../types';
 
 const initialSettings: AppSettings = {
   appTitle: 'Asansör Bakım Takip',
@@ -90,11 +90,11 @@ const initialSettings: AppSettings = {
       </div>
     </div>
   `,
-  proposalTemplate: `
+  installationProposalTemplate: `
     <div class="proposal">
       <div class="header">
         <div class="company-name">{{COMPANY_NAME}}</div>
-        <div class="proposal-title">{{PROPOSAL_TYPE}}</div>
+        <div class="proposal-title">MONTAJ TEKLİFİ</div>
       </div>
       
       <div class="content">
@@ -107,6 +107,8 @@ const initialSettings: AppSettings = {
         </div>
         
         <p>{{DESCRIPTION}}</p>
+        
+        {{CUSTOM_FIELDS}}
         
         <table class="items-table">
           <thead>
@@ -129,6 +131,96 @@ const initialSettings: AppSettings = {
       
       <div class="footer">
         <p>Bu teklif 30 gün geçerlidir.</p>
+        <p>{{COMPANY_PHONE}}</p>
+      </div>
+    </div>
+  `,
+  maintenanceProposalTemplate: `
+    <div class="proposal">
+      <div class="header">
+        <div class="company-name">{{COMPANY_NAME}}</div>
+        <div class="proposal-title">BAKIM SÖZLEŞMESİ</div>
+      </div>
+      
+      <div class="content">
+        <h2>{{PROPOSAL_TITLE}}</h2>
+        
+        <div class="building-info">
+          <strong>Bina:</strong> {{BUILDING_NAME}}<br>
+          <strong>Tarih:</strong> {{DATE}}<br>
+          <strong>Hazırlayan:</strong> {{CREATED_BY}}
+        </div>
+        
+        <p>{{DESCRIPTION}}</p>
+        
+        {{CUSTOM_FIELDS}}
+        
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th>Hizmet</th>
+              <th>Süre</th>
+              <th>Aylık Ücret</th>
+              <th>Toplam</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{ITEMS}}
+          </tbody>
+        </table>
+        
+        <div class="total">
+          Toplam Tutar: {{TOTAL_AMOUNT}}
+        </div>
+      </div>
+      
+      <div class="footer">
+        <p>Bu sözleşme 12 ay geçerlidir.</p>
+        <p>{{COMPANY_PHONE}}</p>
+      </div>
+    </div>
+  `,
+  revisionProposalTemplate: `
+    <div class="proposal">
+      <div class="header">
+        <div class="company-name">{{COMPANY_NAME}}</div>
+        <div class="proposal-title">REVİZYON TEKLİFİ</div>
+      </div>
+      
+      <div class="content">
+        <h2>{{PROPOSAL_TITLE}}</h2>
+        
+        <div class="building-info">
+          <strong>Bina:</strong> {{BUILDING_NAME}}<br>
+          <strong>Tarih:</strong> {{DATE}}<br>
+          <strong>Hazırlayan:</strong> {{CREATED_BY}}
+        </div>
+        
+        <p>{{DESCRIPTION}}</p>
+        
+        {{CUSTOM_FIELDS}}
+        
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th>Revizyon İşlemi</th>
+              <th>Miktar</th>
+              <th>Birim Fiyat</th>
+              <th>Toplam</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{ITEMS}}
+          </tbody>
+        </table>
+        
+        <div class="total">
+          Toplam Tutar: {{TOTAL_AMOUNT}}
+        </div>
+      </div>
+      
+      <div class="footer">
+        <p>Bu teklif 45 gün geçerlidir.</p>
         <p>{{COMPANY_PHONE}}</p>
       </div>
     </div>
@@ -182,6 +274,43 @@ const sampleParts = [
   { name: 'Kat Butonu', quantity: 15, price: 65 }
 ];
 
+const initialProposalTemplates: ProposalTemplate[] = [
+  {
+    id: 'installation-template-1',
+    type: 'installation',
+    name: 'Standart Montaj Teklifi',
+    content: '',
+    fields: [
+      { id: 'elevator_type', name: 'elevator_type', label: 'Asansör Tipi', type: 'text', required: true, placeholder: 'Yolcu asansörü' },
+      { id: 'capacity', name: 'capacity', label: 'Kapasite (kg)', type: 'number', required: true, placeholder: '630' },
+      { id: 'floors', name: 'floors', label: 'Kat Sayısı', type: 'number', required: true, placeholder: '5' },
+      { id: 'installation_time', name: 'installation_time', label: 'Montaj Süresi', type: 'text', required: false, placeholder: '15 gün' }
+    ]
+  },
+  {
+    id: 'maintenance-template-1',
+    type: 'maintenance',
+    name: 'Standart Bakım Sözleşmesi',
+    content: '',
+    fields: [
+      { id: 'contract_duration', name: 'contract_duration', label: 'Sözleşme Süresi', type: 'text', required: true, placeholder: '12 ay' },
+      { id: 'visit_frequency', name: 'visit_frequency', label: 'Ziyaret Sıklığı', type: 'text', required: true, placeholder: 'Ayda 1 kez' },
+      { id: 'emergency_service', name: 'emergency_service', label: 'Acil Servis', type: 'text', required: false, placeholder: '7/24' }
+    ]
+  },
+  {
+    id: 'revision-template-1',
+    type: 'revision',
+    name: 'Standart Revizyon Teklifi',
+    content: '',
+    fields: [
+      { id: 'current_age', name: 'current_age', label: 'Mevcut Asansör Yaşı', type: 'number', required: true, placeholder: '15' },
+      { id: 'revision_scope', name: 'revision_scope', label: 'Revizyon Kapsamı', type: 'textarea', required: true, placeholder: 'Makine dairesi yenileme, kabin modernizasyonu' },
+      { id: 'completion_time', name: 'completion_time', label: 'Tamamlanma Süresi', type: 'text', required: false, placeholder: '30 gün' }
+    ]
+  }
+];
+
 const initialAppState: AppState = {
   buildings: [],
   parts: [],
@@ -203,6 +332,8 @@ const initialAppState: AppState = {
   smsTemplates: [],
   proposals: [],
   payments: [],
+  debtRecords: [],
+  proposalTemplates: initialProposalTemplates,
 };
 
 interface AppContextProps {
@@ -219,6 +350,7 @@ interface AppContextProps {
   increasePrices: (percentage: number) => void;
   installPart: (installation: Omit<PartInstallation, 'id' | 'installedBy'>) => void;
   installManualPart: (installation: Omit<ManualPartInstallation, 'id' | 'installedBy'>) => void;
+  markPartAsPaid: (installationId: string, isManual: boolean) => void;
   payDebt: (buildingId: string, amount: number) => void;
   toggleSidebar: () => void;
   updateSettings: (settings: Partial<AppSettings>) => void;
@@ -238,6 +370,9 @@ interface AppContextProps {
   updateProposal: (proposal: Proposal) => void;
   deleteProposal: (id: string) => void;
   addPayment: (payment: Omit<Payment, 'id'>) => void;
+  addProposalTemplate: (template: Omit<ProposalTemplate, 'id'>) => void;
+  updateProposalTemplate: (template: ProposalTemplate) => void;
+  deleteProposalTemplate: (id: string) => void;
 }
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
@@ -277,13 +412,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         settings: {
           ...initialSettings,
           ...parsedState.settings,
-          companyAddress: parsedState.settings?.companyAddress || initialSettings.companyAddress
+          companyAddress: parsedState.settings?.companyAddress || initialSettings.companyAddress,
+          installationProposalTemplate: parsedState.settings?.installationProposalTemplate || initialSettings.installationProposalTemplate,
+          maintenanceProposalTemplate: parsedState.settings?.maintenanceProposalTemplate || initialSettings.maintenanceProposalTemplate,
+          revisionProposalTemplate: parsedState.settings?.revisionProposalTemplate || initialSettings.revisionProposalTemplate
         },
         maintenanceRecords: parsedState.maintenanceRecords || [],
         smsTemplates: parsedState.smsTemplates || [],
         proposals: parsedState.proposals || [],
         payments: parsedState.payments || [],
-        manualPartInstallations: parsedState.manualPartInstallations || []
+        manualPartInstallations: parsedState.manualPartInstallations || [],
+        debtRecords: parsedState.debtRecords || [],
+        proposalTemplates: parsedState.proposalTemplates || initialProposalTemplates
       };
     }
     return initialAppState;
@@ -325,6 +465,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     localStorage.setItem('appState', JSON.stringify(state));
   }, [state]);
+
+  const addDebtRecord = (buildingId: string, type: 'maintenance' | 'part' | 'payment', description: string, amount: number, performedBy?: string) => {
+    const building = state.buildings.find(b => b.id === buildingId);
+    if (!building) return;
+
+    const debtRecord: DebtRecord = {
+      id: uuidv4(),
+      buildingId,
+      date: new Date().toISOString(),
+      type,
+      description,
+      amount,
+      previousDebt: building.debt,
+      newDebt: type === 'payment' ? building.debt - amount : building.debt + amount,
+      performedBy
+    };
+
+    setState(prev => ({
+      ...prev,
+      debtRecords: [debtRecord, ...prev.debtRecords]
+    }));
+  };
 
   const addUpdate = (action: string, details: string) => {
     if (!state.currentUser) return;
@@ -384,6 +546,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...prev,
       buildings: [...prev.buildings, newBuilding],
     }));
+
+    // Add initial debt record if there's debt
+    if (building.debt > 0) {
+      addDebtRecord(newBuilding.id, 'maintenance', 'Başlangıç borcu', building.debt);
+    }
     
     addUpdate('Bina Eklendi', `${newBuilding.name} eklendi`);
   };
@@ -435,6 +602,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (isMaintained && lastMaintenanceMonth !== currentMonth) {
       const totalMaintenanceFee = building.maintenanceFee * building.elevatorCount;
       debt += totalMaintenanceFee;
+
+      // Add debt record
+      addDebtRecord(building.id, 'maintenance', `Bakım ücreti (${building.elevatorCount} asansör)`, totalMaintenanceFee, state.currentUser.name);
 
       // Add to maintenance history
       const maintenanceRecord: MaintenanceHistory = {
@@ -921,7 +1091,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...installation,
       id: uuidv4(),
       installedBy: state.currentUser.name,
+      isPaid: false,
     };
+
+    const totalCost = part.price * installation.quantity;
     
     setState(prev => ({
       ...prev,
@@ -931,7 +1104,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ? { ...p, quantity: p.quantity - installation.quantity }
           : p
       ),
+      buildings: prev.buildings.map(b =>
+        b.id === building.id
+          ? { ...b, debt: b.debt + totalCost }
+          : b
+      )
     }));
+
+    // Add debt record for part installation
+    addDebtRecord(building.id, 'part', `${part.name} (${installation.quantity} adet)`, totalCost, state.currentUser.name);
     
     addUpdate(
       'Parça Takıldı', 
@@ -949,17 +1130,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...installation,
       id: uuidv4(),
       installedBy: state.currentUser.name,
+      isPaid: false,
     };
     
     setState(prev => ({
       ...prev,
       manualPartInstallations: [...prev.manualPartInstallations, newInstallation],
+      buildings: prev.buildings.map(b =>
+        b.id === building.id
+          ? { ...b, debt: b.debt + installation.totalPrice }
+          : b
+      )
     }));
+
+    // Add debt record for manual part installation
+    addDebtRecord(building.id, 'part', `${installation.partName} (${installation.quantity} adet)`, installation.totalPrice, state.currentUser.name);
     
     addUpdate(
       'Manuel Parça Takıldı', 
       `${building.name} binasına ${installation.quantity} adet ${installation.partName} takıldı`
     );
+  };
+
+  const markPartAsPaid = (installationId: string, isManual: boolean) => {
+    if (!state.currentUser) return;
+
+    const now = new Date().toISOString();
+
+    if (isManual) {
+      setState(prev => ({
+        ...prev,
+        manualPartInstallations: prev.manualPartInstallations.map(installation =>
+          installation.id === installationId
+            ? { ...installation, isPaid: true, paymentDate: now }
+            : installation
+        )
+      }));
+    } else {
+      setState(prev => ({
+        ...prev,
+        partInstallations: prev.partInstallations.map(installation =>
+          installation.id === installationId
+            ? { ...installation, isPaid: true, paymentDate: now }
+            : installation
+        )
+      }));
+    }
+
+    addUpdate('Parça Ödemesi', 'Parça ödemesi olarak işaretlendi');
   };
 
   const payDebt = (buildingId: string, amount: number) => {
@@ -984,6 +1202,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ),
       incomes: [newIncome, ...prev.incomes],
     }));
+
+    // Add debt record for payment
+    addDebtRecord(buildingId, 'payment', `Ödeme alındı`, amount, state.currentUser.name);
     
     addUpdate(
       'Borç Ödendi', 
@@ -1019,6 +1240,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       payments: [newPayment, ...prev.payments],
       incomes: [newIncome, ...prev.incomes],
     }));
+
+    // Add debt record for payment
+    addDebtRecord(payment.buildingId, 'payment', `Ödeme alındı - ${payment.notes || ''}`, payment.amount, payment.receivedBy);
     
     addUpdate(
       'Ödeme Alındı', 
@@ -1276,6 +1500,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addUpdate('Teklif Silindi', `${proposal.title} teklifi silindi`);
   };
 
+  const addProposalTemplate = (template: Omit<ProposalTemplate, 'id'>) => {
+    const newTemplate = {
+      ...template,
+      id: uuidv4(),
+    };
+
+    setState(prev => ({
+      ...prev,
+      proposalTemplates: [...prev.proposalTemplates, newTemplate],
+    }));
+
+    addUpdate('Teklif Şablonu Eklendi', `${newTemplate.name} şablonu eklendi`);
+  };
+
+  const updateProposalTemplate = (template: ProposalTemplate) => {
+    setState(prev => ({
+      ...prev,
+      proposalTemplates: prev.proposalTemplates.map(t => 
+        t.id === template.id ? template : t
+      ),
+    }));
+
+    addUpdate('Teklif Şablonu Güncellendi', `${template.name} şablonu güncellendi`);
+  };
+
+  const deleteProposalTemplate = (id: string) => {
+    const template = state.proposalTemplates.find(t => t.id === id);
+    if (!template) return;
+
+    setState(prev => ({
+      ...prev,
+      proposalTemplates: prev.proposalTemplates.filter(t => t.id !== id),
+    }));
+
+    addUpdate('Teklif Şablonu Silindi', `${template.name} şablonu silindi`);
+  };
+
   return (
     <AppContext.Provider value={{ 
       state, 
@@ -1291,6 +1552,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       increasePrices,
       installPart,
       installManualPart,
+      markPartAsPaid,
       payDebt,
       toggleSidebar,
       updateSettings,
@@ -1309,7 +1571,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addProposal,
       updateProposal,
       deleteProposal,
-      addPayment
+      addPayment,
+      addProposalTemplate,
+      updateProposalTemplate,
+      deleteProposalTemplate
     }}>
       {children}
     </AppContext.Provider>

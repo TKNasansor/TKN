@@ -10,11 +10,13 @@ const ProposalTypePage: React.FC = () => {
   
   const [showForm, setShowForm] = useState(false);
   const [editingProposal, setEditingProposal] = useState<string | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState('');
   
   const [proposalForm, setProposalForm] = useState({
     buildingName: '',
     title: '',
     description: '',
+    fieldValues: {} as Record<string, any>,
     items: [{ id: '1', description: '', quantity: 1, unitPrice: 0, totalPrice: 0 }],
     totalAmount: 0,
     status: 'draft' as 'draft' | 'sent' | 'accepted' | 'rejected',
@@ -57,6 +59,7 @@ const ProposalTypePage: React.FC = () => {
   }
 
   const filteredProposals = state.proposals.filter(proposal => proposal.type === type);
+  const availableTemplates = state.proposalTemplates.filter(template => template.type === type);
 
   const handleItemChange = (index: number, field: string, value: any) => {
     const newItems = [...proposalForm.items];
@@ -115,7 +118,8 @@ const ProposalTypePage: React.FC = () => {
     
     const proposalData = {
       ...proposalForm,
-      type: type as 'installation' | 'maintenance' | 'revision'
+      type: type as 'installation' | 'maintenance' | 'revision',
+      templateId: selectedTemplate
     };
     
     if (editingProposal) {
@@ -134,11 +138,13 @@ const ProposalTypePage: React.FC = () => {
       buildingName: '',
       title: '',
       description: '',
+      fieldValues: {},
       items: [{ id: '1', description: '', quantity: 1, unitPrice: 0, totalPrice: 0 }],
       totalAmount: 0,
       status: 'draft',
       pdfAttachment: ''
     });
+    setSelectedTemplate('');
   };
 
   const handleEdit = (proposal: any) => {
@@ -146,16 +152,22 @@ const ProposalTypePage: React.FC = () => {
       buildingName: proposal.buildingName,
       title: proposal.title,
       description: proposal.description,
+      fieldValues: proposal.fieldValues || {},
       items: proposal.items,
       totalAmount: proposal.totalAmount,
       status: proposal.status,
       pdfAttachment: proposal.pdfAttachment || ''
     });
+    setSelectedTemplate(proposal.templateId || '');
     setEditingProposal(proposal.id);
     setShowForm(true);
   };
 
   const generateProposalPreview = (proposal: any) => {
+    const template = state.proposalTemplates.find(t => t.id === proposal.templateId);
+    const templateContent = template ? 
+      state.settings?.[`${proposal.type}ProposalTemplate` as keyof typeof state.settings] || '' : '';
+
     return `
       <!DOCTYPE html>
       <html>
@@ -168,6 +180,9 @@ const ProposalTypePage: React.FC = () => {
             .proposal-title { font-size: 20px; color: #666; margin-top: 10px; }
             .content { margin-bottom: 30px; }
             .building-info { background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0; }
+            .custom-fields { margin: 20px 0; }
+            .field { margin: 10px 0; }
+            .field-label { font-weight: bold; }
             .items-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
             .items-table th, .items-table td { border: 1px solid #ddd; padding: 12px; text-align: left; }
             .items-table th { background-color: #f2f2f2; font-weight: bold; }
@@ -192,6 +207,18 @@ const ProposalTypePage: React.FC = () => {
             </div>
             
             <p>${proposal.description}</p>
+            
+            ${template && template.fields.length > 0 ? `
+              <div class="custom-fields">
+                <h3>Detaylar</h3>
+                ${template.fields.map((field: any) => `
+                  <div class="field">
+                    <span class="field-label">${field.label}:</span>
+                    <span>${proposal.fieldValues[field.name] || '-'}</span>
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
             
             <table class="items-table">
               <thead>
@@ -241,6 +268,8 @@ const ProposalTypePage: React.FC = () => {
       previewWindow.focus();
     }
   };
+
+  const selectedTemplateData = state.proposalTemplates.find(t => t.id === selectedTemplate);
 
   return (
     <div className="p-4 md:p-6">
@@ -373,6 +402,26 @@ const ProposalTypePage: React.FC = () => {
                   </select>
                 </div>
               </div>
+
+              {availableTemplates.length > 0 && (
+                <div className="mt-6">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Şablon Seç
+                  </label>
+                  <select
+                    value={selectedTemplate}
+                    onChange={(e) => setSelectedTemplate(e.target.value)}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Şablon seçin (opsiyonel)</option>
+                    {availableTemplates.map((template) => (
+                      <option key={template.id} value={template.id}>
+                        {template.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               
               <div className="mt-6">
                 <label className="block text-sm font-medium text-gray-700">
@@ -400,6 +449,47 @@ const ProposalTypePage: React.FC = () => {
                   placeholder="Teklif açıklaması"
                 />
               </div>
+
+              {/* Custom Fields */}
+              {selectedTemplateData && selectedTemplateData.fields.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Özel Alanlar</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {selectedTemplateData.fields.map((field) => (
+                      <div key={field.id}>
+                        <label className="block text-sm font-medium text-gray-700">
+                          {field.label} {field.required && <span className="text-red-500">*</span>}
+                        </label>
+                        {field.type === 'textarea' ? (
+                          <textarea
+                            rows={3}
+                            required={field.required}
+                            value={proposalForm.fieldValues[field.name] || ''}
+                            onChange={(e) => setProposalForm(prev => ({
+                              ...prev,
+                              fieldValues: { ...prev.fieldValues, [field.name]: e.target.value }
+                            }))}
+                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                            placeholder={field.placeholder}
+                          />
+                        ) : (
+                          <input
+                            type={field.type}
+                            required={field.required}
+                            value={proposalForm.fieldValues[field.name] || ''}
+                            onChange={(e) => setProposalForm(prev => ({
+                              ...prev,
+                              fieldValues: { ...prev.fieldValues, [field.name]: e.target.value }
+                            }))}
+                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                            placeholder={field.placeholder}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="mt-6">
                 <label className="block text-sm font-medium text-gray-700">

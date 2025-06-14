@@ -11,6 +11,8 @@ export interface Building {
     il: string;
     ilce: string;
     binaNo: string;
+    latitude?: number;
+    longitude?: number;
   };
   notes: string;
   isMaintained: boolean;
@@ -34,6 +36,8 @@ export interface PartInstallation {
   quantity: number;
   installDate: string;
   installedBy: string;
+  isPaid: boolean;
+  paymentDate?: string;
 }
 
 export interface ManualPartInstallation {
@@ -45,6 +49,8 @@ export interface ManualPartInstallation {
   totalPrice: number;
   installDate: string;
   installedBy: string;
+  isPaid: boolean;
+  paymentDate?: string;
 }
 
 export interface Update {
@@ -68,6 +74,18 @@ export interface User {
   name: string;
 }
 
+export interface DebtRecord {
+  id: string;
+  buildingId: string;
+  date: string;
+  type: 'maintenance' | 'part' | 'payment';
+  description: string;
+  amount: number;
+  previousDebt: number;
+  newDebt: number;
+  performedBy?: string;
+}
+
 export interface AppSettings {
   appTitle: string;
   logo: string | null;
@@ -79,9 +97,13 @@ export interface AppSettings {
     il: string;
     ilce: string;
     binaNo: string;
+    latitude?: number;
+    longitude?: number;
   };
   receiptTemplate: string;
-  proposalTemplate: string;
+  installationProposalTemplate: string;
+  maintenanceProposalTemplate: string;
+  revisionProposalTemplate: string;
   faultReportTemplate: string;
 }
 
@@ -142,12 +164,32 @@ export interface SMSTemplate {
   content: string;
 }
 
+export interface ProposalTemplate {
+  id: string;
+  type: 'installation' | 'maintenance' | 'revision';
+  name: string;
+  content: string;
+  fields: ProposalField[];
+  fileAttachment?: string;
+}
+
+export interface ProposalField {
+  id: string;
+  name: string;
+  label: string;
+  type: 'text' | 'number' | 'date' | 'textarea';
+  required: boolean;
+  placeholder?: string;
+}
+
 export interface Proposal {
   id: string;
   type: 'installation' | 'maintenance' | 'revision';
+  templateId: string;
   buildingName: string;
   title: string;
   description: string;
+  fieldValues: Record<string, any>;
   items: ProposalItem[];
   totalAmount: number;
   createdDate: string;
@@ -195,4 +237,6 @@ export interface AppState {
   smsTemplates: SMSTemplate[];
   proposals: Proposal[];
   payments: Payment[];
+  debtRecords: DebtRecord[];
+  proposalTemplates: ProposalTemplate[];
 }

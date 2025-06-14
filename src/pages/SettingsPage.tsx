@@ -1,12 +1,15 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { Settings, User, Edit2, Save, X, Trash2, Building, FileText, QrCode } from 'lucide-react';
+import { Settings, User, Edit2, Save, X, Trash2, Building, FileText, QrCode, Upload, Plus } from 'lucide-react';
 
 const SettingsPage: React.FC = () => {
-  const { state, updateSettings, deleteUser } = useApp();
+  const { state, updateSettings, deleteUser, addProposalTemplate, updateProposalTemplate, deleteProposalTemplate } = useApp();
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingCompany, setEditingCompany] = useState(false);
   const [editingTemplates, setEditingTemplates] = useState<string | null>(null);
+  const [showProposalTemplateForm, setShowProposalTemplateForm] = useState(false);
+  const [editingProposalTemplate, setEditingProposalTemplate] = useState<string | null>(null);
+  
   const [newTitle, setNewTitle] = useState(state.settings?.appTitle ?? '');
   const [companyInfo, setCompanyInfo] = useState({
     companyName: state.settings?.companyName ?? '',
@@ -21,9 +24,19 @@ const SettingsPage: React.FC = () => {
   });
   const [templates, setTemplates] = useState({
     receiptTemplate: state.settings?.receiptTemplate ?? '',
-    proposalTemplate: state.settings?.proposalTemplate ?? '',
+    installationProposalTemplate: state.settings?.installationProposalTemplate ?? '',
+    maintenanceProposalTemplate: state.settings?.maintenanceProposalTemplate ?? '',
+    revisionProposalTemplate: state.settings?.revisionProposalTemplate ?? '',
     faultReportTemplate: state.settings?.faultReportTemplate ?? ''
   });
+  
+  const [proposalTemplateForm, setProposalTemplateForm] = useState({
+    type: 'installation' as 'installation' | 'maintenance' | 'revision',
+    name: '',
+    content: '',
+    fields: [] as any[]
+  });
+  
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -79,6 +92,63 @@ const SettingsPage: React.FC = () => {
     if (!state.settings?.companyAddress) return 'Belirtilmemiş';
     const { mahalle, sokak, binaNo, ilce, il } = state.settings.companyAddress;
     return `${mahalle} ${sokak} ${binaNo}, ${ilce}/${il}`.trim();
+  };
+
+  const addField = () => {
+    const newField = {
+      id: `field_${Date.now()}`,
+      name: '',
+      label: '',
+      type: 'text',
+      required: false,
+      placeholder: ''
+    };
+    setProposalTemplateForm(prev => ({
+      ...prev,
+      fields: [...prev.fields, newField]
+    }));
+  };
+
+  const updateField = (index: number, field: string, value: any) => {
+    setProposalTemplateForm(prev => ({
+      ...prev,
+      fields: prev.fields.map((f, i) => i === index ? { ...f, [field]: value } : f)
+    }));
+  };
+
+  const removeField = (index: number) => {
+    setProposalTemplateForm(prev => ({
+      ...prev,
+      fields: prev.fields.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleProposalTemplateSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingProposalTemplate) {
+      updateProposalTemplate({ ...proposalTemplateForm, id: editingProposalTemplate });
+      setEditingProposalTemplate(null);
+    } else {
+      addProposalTemplate(proposalTemplateForm);
+    }
+    setProposalTemplateForm({
+      type: 'installation',
+      name: '',
+      content: '',
+      fields: []
+    });
+    setShowProposalTemplateForm(false);
+  };
+
+  const editProposalTemplate = (template: any) => {
+    setProposalTemplateForm({
+      type: template.type,
+      name: template.name,
+      content: template.content,
+      fields: template.fields
+    });
+    setEditingProposalTemplate(template.id);
+    setShowProposalTemplateForm(true);
   };
   
   return (
@@ -350,6 +420,26 @@ const SettingsPage: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Bakım Fişi Şablonu
                   </label>
+                  <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-2">Kullanılabilir Değişkenler:</h4>
+                    <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                      <div>{{`{{LOGO}}`}} - Firma logosu</div>
+                      <div>{{`{{COMPANY_NAME}}`}} - Firma adı</div>
+                      <div>{{`{{COMPANY_ADDRESS}}`}} - Firma adresi</div>
+                      <div>{{`{{COMPANY_PHONE}}`}} - Firma telefonu</div>
+                      <div>{{`{{DATE}}`}} - Tarih</div>
+                      <div>{{`{{BUILDING_NAME}}`}} - Bina adı</div>
+                      <div>{{`{{BUILDING_ADDRESS}}`}} - Bina adresi</div>
+                      <div>{{`{{ELEVATOR_COUNT}}`}} - Asansör sayısı</div>
+                      <div>{{`{{MAINTENANCE_ACTION}}`}} - Bakım işlemi</div>
+                      <div>{{`{{TECHNICIAN}}`}} - Teknisyen</div>
+                      <div>{{`{{MAINTENANCE_FEE}}`}} - Bakım ücreti</div>
+                      <div>{{`{{PARTS_SECTION}}`}} - Parçalar bölümü</div>
+                      <div>{{`{{DEBT_SECTION}}`}} - Borç bölümü</div>
+                      <div>{{`{{TOTAL_AMOUNT}}`}} - Toplam tutar</div>
+                      <div>{{`{{TIMESTAMP}}`}} - Zaman damgası</div>
+                    </div>
+                  </div>
                   <textarea
                     rows={8}
                     value={templates.receiptTemplate}
@@ -361,14 +451,40 @@ const SettingsPage: React.FC = () => {
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Teklif Şablonu
+                    Montaj Teklifi Şablonu
                   </label>
                   <textarea
                     rows={8}
-                    value={templates.proposalTemplate}
-                    onChange={(e) => setTemplates(prev => ({ ...prev, proposalTemplate: e.target.value }))}
+                    value={templates.installationProposalTemplate}
+                    onChange={(e) => setTemplates(prev => ({ ...prev, installationProposalTemplate: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                    placeholder="Teklif HTML şablonu..."
+                    placeholder="Montaj teklifi HTML şablonu..."
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Bakım Sözleşmesi Şablonu
+                  </label>
+                  <textarea
+                    rows={8}
+                    value={templates.maintenanceProposalTemplate}
+                    onChange={(e) => setTemplates(prev => ({ ...prev, maintenanceProposalTemplate: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                    placeholder="Bakım sözleşmesi HTML şablonu..."
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Revizyon Teklifi Şablonu
+                  </label>
+                  <textarea
+                    rows={8}
+                    value={templates.revisionProposalTemplate}
+                    onChange={(e) => setTemplates(prev => ({ ...prev, revisionProposalTemplate: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                    placeholder="Revizyon teklifi HTML şablonu..."
                   />
                 </div>
                 
@@ -398,7 +514,9 @@ const SettingsPage: React.FC = () => {
                       setEditingTemplates(null);
                       setTemplates({
                         receiptTemplate: state.settings?.receiptTemplate ?? '',
-                        proposalTemplate: state.settings?.proposalTemplate ?? '',
+                        installationProposalTemplate: state.settings?.installationProposalTemplate ?? '',
+                        maintenanceProposalTemplate: state.settings?.maintenanceProposalTemplate ?? '',
+                        revisionProposalTemplate: state.settings?.revisionProposalTemplate ?? '',
                         faultReportTemplate: state.settings?.faultReportTemplate ?? ''
                       });
                     }}
@@ -416,14 +534,72 @@ const SettingsPage: React.FC = () => {
                   <p className="text-sm text-gray-500">Bakım fişlerinin görünümünü düzenleyin</p>
                 </div>
                 <div>
-                  <h4 className="text-sm font-medium text-gray-700">Teklif Şablonu</h4>
-                  <p className="text-sm text-gray-500">Teklif belgelerinin görünümünü düzenleyin</p>
+                  <h4 className="text-sm font-medium text-gray-700">Teklif Şablonları</h4>
+                  <p className="text-sm text-gray-500">Montaj, bakım ve revizyon teklif belgelerinin görünümünü düzenleyin</p>
                 </div>
                 <div>
                   <h4 className="text-sm font-medium text-gray-700">Arıza Bildirim Şablonu</h4>
                   <p className="text-sm text-gray-500">QR kod sayfasının görünümünü düzenleyin</p>
                 </div>
               </div>
+            )}
+          </div>
+        </div>
+
+        {/* Proposal Templates */}
+        <div className="bg-white shadow rounded-lg overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <FileText className="h-5 w-5 text-gray-500 mr-2" />
+                <h3 className="text-lg font-medium text-gray-900">Teklif Şablonları</h3>
+              </div>
+              <button
+                onClick={() => setShowProposalTemplateForm(true)}
+                className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded text-white bg-blue-600 hover:bg-blue-700"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Şablon Ekle
+              </button>
+            </div>
+          </div>
+          
+          <div className="p-6">
+            {state.proposalTemplates.length > 0 ? (
+              <div className="space-y-4">
+                {state.proposalTemplates.map((template) => (
+                  <div key={template.id} className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-900">{template.name}</h4>
+                        <p className="text-xs text-gray-500">
+                          {template.type === 'installation' ? 'Montaj Teklifi' :
+                           template.type === 'maintenance' ? 'Bakım Sözleşmesi' : 'Revizyon Teklifi'}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {template.fields.length} özel alan
+                        </p>
+                      </div>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => editProposalTemplate(template)}
+                          className="p-1 text-blue-600 hover:text-blue-800"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => deleteProposalTemplate(template.id)}
+                          className="p-1 text-red-600 hover:text-red-800"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500 text-center py-4">Henüz teklif şablonu bulunmamaktadır.</p>
             )}
           </div>
         </div>
@@ -465,6 +641,161 @@ const SettingsPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Proposal Template Form Modal */}
+      {showProposalTemplateForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-gray-200 px-6 py-4">
+              <h2 className="text-lg font-medium text-gray-800">
+                {editingProposalTemplate ? 'Şablon Düzenle' : 'Yeni Teklif Şablonu'}
+              </h2>
+              <button
+                onClick={() => {
+                  setShowProposalTemplateForm(false);
+                  setEditingProposalTemplate(null);
+                  setProposalTemplateForm({
+                    type: 'installation',
+                    name: '',
+                    content: '',
+                    fields: []
+                  });
+                }}
+                className="text-gray-400 hover:text-gray-500"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleProposalTemplateSubmit} className="p-6">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Şablon Adı
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    value={proposalTemplateForm.name}
+                    onChange={(e) => setProposalTemplateForm(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="Şablon adı"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Teklif Türü
+                  </label>
+                  <select
+                    value={proposalTemplateForm.type}
+                    onChange={(e) => setProposalTemplateForm(prev => ({ ...prev, type: e.target.value as any }))}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="installation">Montaj Teklifi</option>
+                    <option value="maintenance">Bakım Sözleşmesi</option>
+                    <option value="revision">Revizyon Teklifi</option>
+                  </select>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Özel Alanlar
+                    </label>
+                    <button
+                      type="button"
+                      onClick={addField}
+                      className="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded hover:bg-blue-200"
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Alan Ekle
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    {proposalTemplateForm.fields.map((field, index) => (
+                      <div key={index} className="border border-gray-200 rounded-lg p-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600">Alan Adı</label>
+                            <input
+                              type="text"
+                              value={field.name}
+                              onChange={(e) => updateField(index, 'name', e.target.value)}
+                              className="mt-1 block w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                              placeholder="alan_adi"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600">Etiket</label>
+                            <input
+                              type="text"
+                              value={field.label}
+                              onChange={(e) => updateField(index, 'label', e.target.value)}
+                              className="mt-1 block w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                              placeholder="Alan Etiketi"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600">Tip</label>
+                            <select
+                              value={field.type}
+                              onChange={(e) => updateField(index, 'type', e.target.value)}
+                              className="mt-1 block w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                            >
+                              <option value="text">Metin</option>
+                              <option value="number">Sayı</option>
+                              <option value="date">Tarih</option>
+                              <option value="textarea">Uzun Metin</option>
+                            </select>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <label className="flex items-center">
+                              <input
+                                type="checkbox"
+                                checked={field.required}
+                                onChange={(e) => updateField(index, 'required', e.target.checked)}
+                                className="h-3 w-3 text-blue-600"
+                              />
+                              <span className="ml-1 text-xs text-gray-600">Zorunlu</span>
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => removeField(index)}
+                              className="p-1 text-red-600 hover:text-red-800"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="mt-2">
+                          <input
+                            type="text"
+                            value={field.placeholder}
+                            onChange={(e) => updateField(index, 'placeholder', e.target.value)}
+                            className="block w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                            placeholder="Placeholder metni"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="mt-6">
+                <button
+                  type="submit"
+                  className="w-full inline-flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                >
+                  {editingProposalTemplate ? 'Güncelle' : 'Kaydet'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (

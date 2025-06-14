@@ -1,18 +1,26 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { Edit, ChevronLeft, Save, CheckSquare, MapPin, ExternalLink, Tag, Plus, X } from 'lucide-react';
+import { Edit, ChevronLeft, Save, CheckSquare, MapPin, ExternalLink, Tag, Plus, X, Package, CreditCard } from 'lucide-react';
 
 const BuildingDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { state, updateBuilding, installManualPart } = useApp();
+  const { state, updateBuilding, installPart, installManualPart, markPartAsPaid } = useApp();
   
   const building = state.buildings.find(b => b.id === id);
   
   const [isEditing, setIsEditing] = useState(false);
   const [editedBuilding, setEditedBuilding] = useState(building);
-  const [showManualPartForm, setShowManualPartForm] = useState(false);
+  const [showPartForm, setShowPartForm] = useState(false);
+  const [partFormType, setPartFormType] = useState<'inventory' | 'manual'>('manual');
+  
+  const [inventoryPart, setInventoryPart] = useState({
+    partId: '',
+    quantity: 1,
+    installDate: new Date().toISOString().split('T')[0]
+  });
+  
   const [manualPart, setManualPart] = useState({
     partName: '',
     quantity: 1,
@@ -76,6 +84,25 @@ const BuildingDetailsPage: React.FC = () => {
     }
   };
 
+  const handleInventoryPartSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!building) return;
+
+    installPart({
+      buildingId: building.id,
+      partId: inventoryPart.partId,
+      quantity: inventoryPart.quantity,
+      installDate: inventoryPart.installDate
+    });
+
+    setInventoryPart({
+      partId: '',
+      quantity: 1,
+      installDate: new Date().toISOString().split('T')[0]
+    });
+    setShowPartForm(false);
+  };
+
   const handleManualPartSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!building) return;
@@ -97,7 +124,7 @@ const BuildingDetailsPage: React.FC = () => {
       unitPrice: 0,
       installDate: new Date().toISOString().split('T')[0]
     });
-    setShowManualPartForm(false);
+    setShowPartForm(false);
   };
 
   const openGoogleMaps = () => {
@@ -148,6 +175,11 @@ const BuildingDetailsPage: React.FC = () => {
   // Maintenance history for this building
   const maintenanceHistory = state.maintenanceHistory.filter(
     history => history.buildingId === building.id
+  );
+
+  // Debt records for this building
+  const debtRecords = state.debtRecords.filter(
+    record => record.buildingId === building.id
   );
 
   const totalMaintenanceFee = building.maintenanceFee * building.elevatorCount;
@@ -474,106 +506,248 @@ const BuildingDetailsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Manual Part Installation Section */}
+      {/* Part Installation Section */}
       {!isEditing && (
         <div className="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
           <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
-            <h3 className="text-lg leading-6 font-medium text-gray-900">Manuel Parça Ekle</h3>
-            <button
-              onClick={() => setShowManualPartForm(true)}
-              className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded text-white bg-green-600 hover:bg-green-700"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Parça Ekle
-            </button>
+            <h3 className="text-lg leading-6 font-medium text-gray-900">Parça Ekle</h3>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => {
+                  setPartFormType('manual');
+                  setShowPartForm(true);
+                }}
+                className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded text-white bg-green-600 hover:bg-green-700"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Manuel Parça Ekle
+              </button>
+              <button
+                onClick={() => {
+                  setPartFormType('inventory');
+                  setShowPartForm(true);
+                }}
+                className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded text-white bg-blue-600 hover:bg-blue-700"
+              >
+                <Package className="h-4 w-4 mr-1" />
+                Stoktan Parça Ekle
+              </button>
+            </div>
           </div>
           
-          {showManualPartForm && (
+          {showPartForm && (
             <div className="border-t border-gray-200 px-4 py-5 sm:p-6">
-              <form onSubmit={handleManualPartSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Parça Adı
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                      value={manualPart.partName}
-                      onChange={(e) => setManualPart(prev => ({ ...prev, partName: e.target.value }))}
-                      placeholder="Parça adını girin"
-                    />
+              {partFormType === 'manual' ? (
+                <form onSubmit={handleManualPartSubmit} className="space-y-4">
+                  <h4 className="text-md font-medium text-gray-900">Manuel Parça Ekle</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Parça Adı
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        value={manualPart.partName}
+                        onChange={(e) => setManualPart(prev => ({ ...prev, partName: e.target.value }))}
+                        placeholder="Parça adını girin"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Miktar
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        min="1"
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        value={manualPart.quantity}
+                        onChange={(e) => setManualPart(prev => ({ ...prev, quantity: Number(e.target.value) }))}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Birim Fiyat (₺)
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        min="0"
+                        step="0.01"
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        value={manualPart.unitPrice}
+                        onChange={(e) => setManualPart(prev => ({ ...prev, unitPrice: Number(e.target.value) }))}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Takılma Tarihi
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        value={manualPart.installDate}
+                        onChange={(e) => setManualPart(prev => ({ ...prev, installDate: e.target.value }))}
+                      />
+                    </div>
                   </div>
                   
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Miktar
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      min="1"
-                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                      value={manualPart.quantity}
-                      onChange={(e) => setManualPart(prev => ({ ...prev, quantity: Number(e.target.value) }))}
-                    />
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-gray-600">
+                      Toplam Fiyat: {(manualPart.quantity * manualPart.unitPrice).toLocaleString('tr-TR')} ₺
+                    </div>
+                    <div className="flex space-x-3">
+                      <button
+                        type="button"
+                        onClick={() => setShowPartForm(false)}
+                        className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      >
+                        İptal
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700"
+                      >
+                        Parçayı Ekle
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              ) : (
+                <form onSubmit={handleInventoryPartSubmit} className="space-y-4">
+                  <h4 className="text-md font-medium text-gray-900">Stoktan Parça Ekle</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Parça
+                      </label>
+                      <select
+                        required
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        value={inventoryPart.partId}
+                        onChange={(e) => setInventoryPart(prev => ({ ...prev, partId: e.target.value }))}
+                      >
+                        <option value="">Parça seçin...</option>
+                        {state.parts.filter(part => part.quantity > 0).map((part) => (
+                          <option key={part.id} value={part.id}>
+                            {part.name} (Stok: {part.quantity})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Miktar
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        min="1"
+                        max={state.parts.find(p => p.id === inventoryPart.partId)?.quantity || 1}
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        value={inventoryPart.quantity}
+                        onChange={(e) => setInventoryPart(prev => ({ ...prev, quantity: Number(e.target.value) }))}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Takılma Tarihi
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        value={inventoryPart.installDate}
+                        onChange={(e) => setInventoryPart(prev => ({ ...prev, installDate: e.target.value }))}
+                      />
+                    </div>
                   </div>
                   
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Birim Fiyat (₺)
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      min="0"
-                      step="0.01"
-                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                      value={manualPart.unitPrice}
-                      onChange={(e) => setManualPart(prev => ({ ...prev, unitPrice: Number(e.target.value) }))}
-                    />
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-gray-600">
+                      {inventoryPart.partId && (
+                        <>
+                          Toplam Fiyat: {((state.parts.find(p => p.id === inventoryPart.partId)?.price || 0) * inventoryPart.quantity).toLocaleString('tr-TR')} ₺
+                        </>
+                      )}
+                    </div>
+                    <div className="flex space-x-3">
+                      <button
+                        type="button"
+                        onClick={() => setShowPartForm(false)}
+                        className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      >
+                        İptal
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700"
+                      >
+                        Parçayı Ekle
+                      </button>
+                    </div>
                   </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Takılma Tarihi
-                    </label>
-                    <input
-                      type="date"
-                      required
-                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                      value={manualPart.installDate}
-                      onChange={(e) => setManualPart(prev => ({ ...prev, installDate: e.target.value }))}
-                    />
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-gray-600">
-                    Toplam Fiyat: {(manualPart.quantity * manualPart.unitPrice).toLocaleString('tr-TR')} ₺
-                  </div>
-                  <div className="flex space-x-3">
-                    <button
-                      type="button"
-                      onClick={() => setShowManualPartForm(false)}
-                      className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-                    >
-                      İptal
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700"
-                    >
-                      Parçayı Ekle
-                    </button>
-                  </div>
-                </div>
-              </form>
+                </form>
+              )}
             </div>
           )}
         </div>
       )}
+
+      {/* Debt Records Section */}
+      <div className="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
+        <div className="px-4 py-5 sm:px-6">
+          <h3 className="text-lg leading-6 font-medium text-gray-900">Borç Çetelesi</h3>
+        </div>
+        <div className="border-t border-gray-200">
+          {debtRecords.length > 0 ? (
+            <ul className="divide-y divide-gray-200">
+              {debtRecords.map((record) => (
+                <li key={record.id} className="px-4 py-4 sm:px-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className={`h-2 w-2 rounded-full mr-3 ${
+                        record.type === 'payment' ? 'bg-green-500' : 
+                        record.type === 'maintenance' ? 'bg-blue-500' : 'bg-orange-500'
+                      }`}></div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {record.description}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          {new Date(record.date).toLocaleDateString('tr-TR')} - {record.performedBy || 'Sistem'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className={`text-sm font-medium ${
+                        record.type === 'payment' ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {record.type === 'payment' ? '-' : '+'}{record.amount.toLocaleString('tr-TR')} ₺
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Yeni borç: {record.newDebt.toLocaleString('tr-TR')} ₺
+                      </p>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="px-4 py-5 sm:px-6 text-center text-gray-500">
+              Bu binada henüz borç hareketi bulunmamaktadır.
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Maintenance History Section */}
       <div className="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
@@ -625,19 +799,32 @@ const BuildingDetailsPage: React.FC = () => {
                 return (
                   <li key={installation.id} className="px-4 py-4 sm:px-6">
                     <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium text-gray-900">{part?.name}</p>
-                      <p className="text-sm text-gray-500">
-                        {new Date(installation.installDate).toLocaleDateString('tr-TR')}
-                      </p>
-                    </div>
-                    <div className="mt-2 sm:flex sm:justify-between">
-                      <div className="sm:flex">
-                        <p className="flex items-center text-sm text-gray-500">
-                          Miktar: {installation.quantity}
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-900">{part?.name}</p>
+                        <p className="text-sm text-gray-500">
+                          Miktar: {installation.quantity} • 
+                          Tarih: {new Date(installation.installDate).toLocaleDateString('tr-TR')} • 
+                          Takan: {installation.installedBy}
                         </p>
+                        {installation.isPaid && installation.paymentDate && (
+                          <p className="text-xs text-green-600">
+                            Ödendi: {new Date(installation.paymentDate).toLocaleDateString('tr-TR')}
+                          </p>
+                        )}
                       </div>
-                      <div className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
-                        Takılma Tarihi: {new Date(installation.installDate).toLocaleDateString('tr-TR')}
+                      <div className="flex items-center space-x-2">
+                        <div className="text-sm text-gray-600">
+                          {part ? `${(part.price * installation.quantity).toLocaleString('tr-TR')} ₺` : ''}
+                        </div>
+                        {!installation.isPaid && (
+                          <button
+                            onClick={() => markPartAsPaid(installation.id, false)}
+                            className="inline-flex items-center px-2 py-1 text-xs font-medium text-green-700 bg-green-100 rounded hover:bg-green-200"
+                          >
+                            <CreditCard className="h-3 w-3 mr-1" />
+                            Ödendi
+                          </button>
+                        )}
                       </div>
                     </div>
                   </li>
@@ -646,19 +833,35 @@ const BuildingDetailsPage: React.FC = () => {
               {manualInstallations.map((installation) => (
                 <li key={installation.id} className="px-4 py-4 sm:px-6 bg-blue-50">
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-gray-900">{installation.partName} <span className="text-xs text-blue-600">(Manuel)</span></p>
-                    <p className="text-sm text-gray-500">
-                      {new Date(installation.installDate).toLocaleDateString('tr-TR')}
-                    </p>
-                  </div>
-                  <div className="mt-2 sm:flex sm:justify-between">
-                    <div className="sm:flex">
-                      <p className="flex items-center text-sm text-gray-500">
-                        Miktar: {installation.quantity} • Birim Fiyat: {installation.unitPrice.toLocaleString('tr-TR')} ₺
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900">
+                        {installation.partName} <span className="text-xs text-blue-600">(Manuel)</span>
                       </p>
+                      <p className="text-sm text-gray-500">
+                        Miktar: {installation.quantity} • 
+                        Birim Fiyat: {installation.unitPrice.toLocaleString('tr-TR')} ₺ • 
+                        Tarih: {new Date(installation.installDate).toLocaleDateString('tr-TR')} • 
+                        Takan: {installation.installedBy}
+                      </p>
+                      {installation.isPaid && installation.paymentDate && (
+                        <p className="text-xs text-green-600">
+                          Ödendi: {new Date(installation.paymentDate).toLocaleDateString('tr-TR')}
+                        </p>
+                      )}
                     </div>
-                    <div className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
-                      Toplam: {installation.totalPrice.toLocaleString('tr-TR')} ₺
+                    <div className="flex items-center space-x-2">
+                      <div className="text-sm text-gray-600">
+                        {installation.totalPrice.toLocaleString('tr-TR')} ₺
+                      </div>
+                      {!installation.isPaid && (
+                        <button
+                          onClick={() => markPartAsPaid(installation.id, true)}
+                          className="inline-flex items-center px-2 py-1 text-xs font-medium text-green-700 bg-green-100 rounded hover:bg-green-200"
+                        >
+                          <CreditCard className="h-3 w-3 mr-1" />
+                          Ödendi
+                        </button>
+                      )}
                     </div>
                   </div>
                 </li>

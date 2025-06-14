@@ -3,10 +3,9 @@ import { useApp } from '../context/AppContext';
 import { Plus, Search, X, Percent } from 'lucide-react';
 
 const PartsPage: React.FC = () => {
-  const { state, addPart, updatePart, deletePart, increasePrices, installPart } = useApp();
+  const { state, addPart, updatePart, deletePart, increasePrices } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
-  const [showInstallForm, setShowInstallForm] = useState(false);
   const [showPriceIncreaseForm, setShowPriceIncreaseForm] = useState(false);
   const [increasePercentage, setIncreasePercentage] = useState(5);
   
@@ -16,26 +15,11 @@ const PartsPage: React.FC = () => {
     price: 0,
   });
   
-  const [installation, setInstallation] = useState({
-    buildingId: '',
-    partId: '',
-    quantity: 1,
-    installDate: new Date().toISOString().split('T')[0],
-  });
-  
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setNewPart(prev => ({
       ...prev,
       [name]: name === 'name' ? value : Number(value),
-    }));
-  };
-  
-  const handleInstallInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setInstallation(prev => ({
-      ...prev,
-      [name]: value,
     }));
   };
   
@@ -48,31 +32,6 @@ const PartsPage: React.FC = () => {
       price: 0,
     });
     setShowAddForm(false);
-  };
-  
-  const handleInstallPart = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    const selectedPart = state.parts.find(p => p.id === installation.partId);
-    
-    if (!selectedPart || selectedPart.quantity < installation.quantity) {
-      alert('Seçilen parça miktarı stok miktarından fazla olamaz!');
-      return;
-    }
-    
-    installPart({
-      ...installation,
-      quantity: Number(installation.quantity),
-    });
-    
-    setInstallation({
-      buildingId: '',
-      partId: '',
-      quantity: 1,
-      installDate: new Date().toISOString().split('T')[0],
-    });
-    
-    setShowInstallForm(false);
   };
   
   const handleIncreasePrices = (e: React.FormEvent) => {
@@ -112,14 +71,6 @@ const PartsPage: React.FC = () => {
           >
             <Plus className="h-5 w-5 mr-2" />
             Parça Ekle
-          </button>
-          
-          <button
-            type="button"
-            className="inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-            onClick={() => setShowInstallForm(true)}
-          >
-            Parça Tak
           </button>
           
           <button
@@ -204,111 +155,6 @@ const PartsPage: React.FC = () => {
                   className="w-full inline-flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
                   Kaydet
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      
-      {/* Install Part Modal */}
-      {showInstallForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="flex justify-between items-center border-b border-gray-200 px-6 py-4">
-              <h2 className="text-lg font-medium text-gray-800">Parça Tak</h2>
-              <button
-                type="button"
-                className="text-gray-400 hover:text-gray-500"
-                onClick={() => setShowInstallForm(false)}
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-            
-            <form onSubmit={handleInstallPart} className="p-6">
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="buildingId" className="block text-sm font-medium text-gray-700">
-                    Bina
-                  </label>
-                  <select
-                    id="buildingId"
-                    name="buildingId"
-                    required
-                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-                    value={installation.buildingId}
-                    onChange={handleInstallInputChange}
-                  >
-                    <option value="">Bina Seçin</option>
-                    {state.buildings.map((building) => (
-                      <option key={building.id} value={building.id}>
-                        {building.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div>
-                  <label htmlFor="partId" className="block text-sm font-medium text-gray-700">
-                    Parça
-                  </label>
-                  <select
-                    id="partId"
-                    name="partId"
-                    required
-                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-                    value={installation.partId}
-                    onChange={handleInstallInputChange}
-                  >
-                    <option value="">Parça Seçin</option>
-                    {state.parts.filter(part => part.quantity > 0).map((part) => (
-                      <option key={part.id} value={part.id}>
-                        {part.name} (Stok: {part.quantity})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div>
-                  <label htmlFor="quantity" className="block text-sm font-medium text-gray-700">
-                    Miktar
-                  </label>
-                  <input
-                    type="number"
-                    id="quantity"
-                    name="quantity"
-                    required
-                    min="1"
-                    max={state.parts.find(p => p.id === installation.partId)?.quantity || 1}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    value={installation.quantity}
-                    onChange={handleInstallInputChange}
-                  />
-                </div>
-                
-                <div>
-                  <label htmlFor="installDate" className="block text-sm font-medium text-gray-700">
-                    Takılma Tarihi
-                  </label>
-                  <input
-                    type="date"
-                    id="installDate"
-                    name="installDate"
-                    required
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    value={installation.installDate}
-                    onChange={handleInstallInputChange}
-                  />
-                </div>
-              </div>
-              
-              <div className="mt-6">
-                <button
-                  type="submit"
-                  className="w-full inline-flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                >
-                  Parçayı Tak
                 </button>
               </div>
             </form>
