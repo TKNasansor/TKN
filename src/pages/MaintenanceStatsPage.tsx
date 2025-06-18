@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { BarChart3, User, Calendar, TrendingUp } from 'lucide-react';
+import { BarChart3, User, Calendar, TrendingUp, RefreshCw } from 'lucide-react';
+import MaintenanceRecordViewer from '../components/MaintenanceRecordViewer';
 
 const MaintenanceStatsPage: React.FC = () => {
   const { state } = useApp();
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   const months = [
     'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
@@ -51,6 +54,21 @@ const MaintenanceStatsPage: React.FC = () => {
   const totalMaintenances = filteredRecords.length;
   const totalRevenue = filteredRecords.reduce((sum, record) => sum + record.totalFee, 0);
   const uniqueBuildings = Array.from(new Set(filteredRecords.map(record => record.buildingId))).length;
+
+  const handleRetry = async () => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      // Simulate data loading
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      // In a real app, you would refetch data here
+    } catch (err) {
+      setError('Veri yüklenirken hata oluştu. Lütfen tekrar deneyin.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="p-4 md:p-6">
@@ -125,7 +143,7 @@ const MaintenanceStatsPage: React.FC = () => {
       </div>
 
       {/* Technician Performance */}
-      <div className="bg-white shadow rounded-lg overflow-hidden">
+      <div className="bg-white shadow rounded-lg overflow-hidden mb-6">
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900 flex items-center">
             <User className="h-5 w-5 mr-2" />
@@ -199,64 +217,13 @@ const MaintenanceStatsPage: React.FC = () => {
         )}
       </div>
 
-      {/* Detailed Maintenance Records */}
-      {filteredRecords.length > 0 && (
-        <div className="mt-6 bg-white shadow rounded-lg overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900">Detaylı Bakım Kayıtları</h3>
-          </div>
-          
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Tarih
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Bina
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Teknisyen
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Asansör Sayısı
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Toplam Ücret
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredRecords
-                  .sort((a, b) => new Date(b.maintenanceDate).getTime() - new Date(a.maintenanceDate).getTime())
-                  .map((record) => {
-                    const building = state.buildings.find(b => b.id === record.buildingId);
-                    return (
-                      <tr key={record.id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {new Date(record.maintenanceDate).toLocaleDateString('tr-TR')} {record.maintenanceTime}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {building?.name || 'Bilinmeyen Bina'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {record.performedBy}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {record.elevatorCount}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {record.totalFee.toLocaleString('tr-TR')} ₺
-                        </td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      {/* Maintenance Record Viewer */}
+      <MaintenanceRecordViewer
+        records={state.maintenanceRecords}
+        isLoading={isLoading}
+        onRetry={handleRetry}
+        error={error}
+      />
     </div>
   );
 };

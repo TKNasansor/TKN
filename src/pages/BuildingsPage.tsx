@@ -1,19 +1,27 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Building } from '../types';
-import { Plus, Search, X, Check, QrCode, Trash2, Tag } from 'lucide-react';
+import { Plus, Search, X, Check, QrCode, Trash2, Tag, AlertTriangle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
+import FaultNotificationModal from '../components/FaultNotificationModal';
+import UnsavedChangesModal from '../components/UnsavedChangesModal';
+import QRCodeManager from '../components/QRCodeManager';
+import { useAutoSave } from '../hooks/useAutoSave';
 
 const BuildingsPage: React.FC = () => {
-  const { state, addBuilding, deleteBuilding, toggleMaintenance } = useApp();
+  const { state, addBuilding, deleteBuilding, toggleMaintenance, reportFault } = useApp();
   const [activeTab, setActiveTab] = useState<'all' | 'maintained' | 'unmaintained'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [labelFilter, setLabelFilter] = useState<'all' | 'green' | 'blue' | 'yellow' | 'red' | 'none'>('all');
   const [showAddForm, setShowAddForm] = useState(false);
-  const [showQRCode, setShowQRCode] = useState<string | null>(null);
+  const [showQRManager, setShowQRManager] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [showMaintenanceOptions, setShowMaintenanceOptions] = useState<string | null>(null);
+  const [showFaultModal, setShowFaultModal] = useState<string | null>(null);
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+  
   const [newBuilding, setNewBuilding] = useState<Omit<Building, 'id'>>({
     name: '',
     maintenanceFee: 0,
@@ -31,6 +39,17 @@ const BuildingsPage: React.FC = () => {
     isMaintained: false,
     isDefective: false,
     label: null
+  });
+
+  // Auto-save functionality
+  const { hasUnsavedChanges, saveNow, lastSaved } = useAutoSave({
+    formType: 'building-form',
+    formData: newBuilding,
+    enabled: showAddForm,
+    onSave: async (data) => {
+      // Custom save logic if needed
+      console.log('Auto-saving building form data:', data);
+    }
   });
 
   // Sample buildings data
@@ -119,7 +138,7 @@ const BuildingsPage: React.FC = () => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     addBuilding(newBuilding);
     setNewBuilding({
@@ -149,42 +168,61 @@ const BuildingsPage: React.FC = () => {
   };
 
   const handleMaintenanceToggle = (buildingId: string, showReceipt: boolean = false) => {
+    const building = state.buildings.find(b => b.id === buildingId);
+    
+    // If building is being marked as defective, show fault modal
+    if (building && !building.isDefective && !building.isMaintained) {
+      setShowFaultModal(buildingId);
+      return;
+    }
+    
     toggleMaintenance(buildingId, showReceipt);
     setShowMaintenanceOptions(null);
   };
 
-  const handleShowQRCode = (building: Building) => {
-    setShowQRCode(building.id);
+  const handleMarkAsDefective = (buildingId: string) => {
+    setShowFaultModal(buildingId);
   };
 
-  const printQRCode = () => {
-    const printWindow = window.open('', '_blank');
-    if (printWindow && showQRCode) {
-      const building = state.buildings.find(b => b.id === showQRCode);
-      if (!building) return;
+  const handleFaultSubmit = (buildingId: string, faultData: { description: string; severity: 'low' | 'medium' | 'high'; reportedBy: string }) => {
+    reportFault(buildingId, faultData);
+    setShowFaultModal(null);
+  };
 
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>QR Kod - ${building.name}</title>
-            <style>
-              body { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
-              .container { text-align: center; }
-              h2 { margin-bottom: 20px; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <h2>${building.name}</h2>
-              ${document.getElementById('qr-code')?.innerHTML}
-              <p style="margin-top: 20px; font-size: 14px;">Arıza bildirimi için QR kodu okutun</p>
-            </div>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.print();
+  const handleFormClose = () => {
+    if (hasUnsavedChanges) {
+      setPendingAction(() => () => setShowAddForm(false));
+      setShowUnsavedModal(true);
+    } else {
+      setShowAddForm(false);
     }
+  };
+
+  const handleUnsavedSave = async () => {
+    await saveNow();
+    setShowUnsavedModal(false);
+    if (pendingAction) {
+      pendingAction();
+      setPendingAction(null);
+    }
+  };
+
+  const handleUnsavedDiscard = () => {
+    setShowUnsavedModal(false);
+    if (pendingAction) {
+      pendingAction();
+      setPendingAction(null);
+    }
+  };
+
+  const handleUnsavedReturn = () => {
+    setShowUnsavedModal(false);
+    setPendingAction(null);
+  };
+
+  const handleQRSave = (qrData: any) => {
+    console.log('QR Code saved:', qrData);
+    // Here you would typically save the QR data to your state
   };
 
   const getFullAddress = (building: Building) => {
@@ -309,15 +347,21 @@ const BuildingsPage: React.FC = () => {
         </nav>
       </div>
       
+      {/* Add Building Form Modal */}
       {showAddForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b border-gray-200 px-6 py-4">
-              <h2 className="text-lg font-medium text-gray-800">Yeni Bina Ekle</h2>
+              <div>
+                <h2 className="text-lg font-medium text-gray-800">Yeni Bina Ekle</h2>
+                {hasUnsavedChanges && (
+                  <p className="text-xs text-orange-600 mt-1">Kaydedilmemiş değişiklikler var</p>
+                )}
+              </div>
               <button
                 type="button"
                 className="text-gray-400 hover:text-gray-500"
-                onClick={() => setShowAddForm(false)}
+                onClick={handleFormClose}
               >
                 <X className="h-6 w-6" />
               </button>
@@ -519,10 +563,15 @@ const BuildingsPage: React.FC = () => {
                 </div>
               </div>
               
-              <div className="mt-6">
+              <div className="mt-6 flex justify-between items-center">
+                {lastSaved && (
+                  <p className="text-xs text-gray-500">
+                    Son kayıt: {new Date(lastSaved).toLocaleTimeString('tr-TR')}
+                  </p>
+                )}
                 <button
                   type="submit"
-                  className="w-full inline-flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  className="inline-flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
                   Kaydet
                 </button>
@@ -532,39 +581,36 @@ const BuildingsPage: React.FC = () => {
         </div>
       )}
 
-      {showQRCode && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium text-gray-900">
-                Arıza Bildirim QR Kodu
-              </h3>
-              <button
-                onClick={() => setShowQRCode(null)}
-                className="text-gray-400 hover:text-gray-500"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-            <div className="flex flex-col items-center" id="qr-code">
-              <QRCodeSVG
-                value={`${window.location.origin}/report-fault/${showQRCode}`}
-                size={200}
-                level="H"
-              />
-              <p className="mt-4 text-sm text-gray-600 text-center">
-                Bu QR kodu okutarak arıza bildirimi yapılabilir
-              </p>
-            </div>
-            <button
-              onClick={printQRCode}
-              className="mt-4 w-full inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
-            >
-              QR Kodu Yazdır
-            </button>
-          </div>
-        </div>
+      {/* QR Code Manager */}
+      {showQRManager && (
+        <QRCodeManager
+          isOpen={true}
+          buildingId={showQRManager}
+          buildingName={state.buildings.find(b => b.id === showQRManager)?.name || ''}
+          onClose={() => setShowQRManager(null)}
+          onSave={handleQRSave}
+        />
       )}
+
+      {/* Fault Notification Modal */}
+      {showFaultModal && (
+        <FaultNotificationModal
+          isOpen={true}
+          buildingName={state.buildings.find(b => b.id === showFaultModal)?.name || ''}
+          onSubmit={(faultData) => handleFaultSubmit(showFaultModal, faultData)}
+          onCancel={() => setShowFaultModal(null)}
+        />
+      )}
+
+      {/* Unsaved Changes Modal */}
+      <UnsavedChangesModal
+        isOpen={showUnsavedModal}
+        onSave={handleUnsavedSave}
+        onDiscard={handleUnsavedDiscard}
+        onReturn={handleUnsavedReturn}
+        formType="Bina Formu"
+        lastAutoSave={lastSaved}
+      />
 
       {/* Maintenance Options Modal */}
       {showMaintenanceOptions && (
@@ -651,6 +697,9 @@ const BuildingsPage: React.FC = () => {
                       <Link to={`/buildings/${building.id}`} className="block">
                         <div className="flex items-center">
                           <p className="text-sm md:text-base font-medium text-blue-600 truncate">{building.name}</p>
+                          {building.isDefective && (
+                            <AlertTriangle className="h-4 w-4 text-orange-500 ml-2" />
+                          )}
                         </div>
                         <p className="mt-1 flex text-xs md:text-sm text-gray-500">
                           <span className="truncate">{building.elevatorCount} asansör • Bakım: {(building.maintenanceFee * building.elevatorCount).toLocaleString('tr-TR')} ₺</span>
@@ -664,6 +713,12 @@ const BuildingsPage: React.FC = () => {
                             Son bakım: {new Date(building.lastMaintenanceDate).toLocaleDateString('tr-TR')} - {building.lastMaintenanceTime}
                           </p>
                         )}
+                        {building.isDefective && building.faultSeverity && (
+                          <p className="mt-1 text-xs text-red-600">
+                            Arıza: {building.faultSeverity === 'high' ? 'Yüksek' : building.faultSeverity === 'medium' ? 'Orta' : 'Düşük'} öncelik
+                            {building.faultTimestamp && ` - ${new Date(building.faultTimestamp).toLocaleDateString('tr-TR')}`}
+                          </p>
+                        )}
                       </Link>
                     </div>
                   </div>
@@ -675,10 +730,20 @@ const BuildingsPage: React.FC = () => {
                         <span className={`inline-block w-2 h-2 md:w-3 md:h-3 rounded-full ${getLabelColor(building.label)}`}></span>
                       </div>
                     )}
+                    {!building.isDefective && (
+                      <button
+                        type="button"
+                        className="inline-flex items-center p-1 md:p-1.5 border border-transparent rounded-full shadow-sm text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+                        onClick={() => handleMarkAsDefective(building.id)}
+                        title="Arızalı olarak işaretle"
+                      >
+                        <AlertTriangle className="h-3 w-3 md:h-4 md:w-4" />
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="inline-flex items-center p-1 md:p-1.5 border border-transparent rounded-full shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                      onClick={() => handleShowQRCode(building)}
+                      onClick={() => setShowQRManager(building.id)}
                     >
                       <QrCode className="h-3 w-3 md:h-4 md:w-4" />
                     </button>

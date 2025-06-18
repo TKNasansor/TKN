@@ -20,6 +20,9 @@ export interface Building {
   lastMaintenanceTime?: string;
   isDefective?: boolean;
   defectiveNote?: string; // Arıza notu
+  faultSeverity?: 'low' | 'medium' | 'high'; // Arıza şiddeti
+  faultTimestamp?: string; // Arıza zamanı
+  faultReportedBy?: string; // Arızayı bildiren
   label?: 'green' | 'blue' | 'yellow' | 'red' | null;
 }
 
@@ -106,6 +109,7 @@ export interface AppSettings {
   maintenanceProposalTemplate: string;
   revisionProposalTemplate: string;
   faultReportTemplate: string;
+  autoSaveInterval: number; // Auto-save interval in seconds
 }
 
 export interface FaultReport {
@@ -148,6 +152,9 @@ export interface MaintenanceRecord {
   maintenanceTime: string;
   elevatorCount: number;
   totalFee: number;
+  status: 'completed' | 'pending' | 'cancelled';
+  priority: 'low' | 'medium' | 'high';
+  searchableText?: string; // For search functionality
 }
 
 export interface Printer {
@@ -229,6 +236,35 @@ export interface Payment {
   notes?: string;
 }
 
+export interface QRCodeData {
+  id: string;
+  buildingId: string;
+  content: string;
+  customFields: Record<string, any>;
+  generatedDate: string;
+  isActive: boolean;
+}
+
+export interface NotificationData {
+  id: string;
+  type: 'fault' | 'maintenance' | 'payment' | 'system';
+  title: string;
+  message: string;
+  timestamp: string;
+  isRead: boolean;
+  severity: 'low' | 'medium' | 'high';
+  actionRequired: boolean;
+  relatedId?: string; // Related building, part, etc.
+}
+
+export interface AutoSaveData {
+  id: string;
+  formType: string;
+  formData: any;
+  timestamp: string;
+  userId: string;
+}
+
 export interface AppState {
   buildings: Building[];
   parts: Part[];
@@ -253,4 +289,10 @@ export interface AppState {
   payments: Payment[];
   debtRecords: DebtRecord[];
   proposalTemplates: ProposalTemplate[];
+  qrCodes: QRCodeData[];
+  systemNotifications: NotificationData[];
+  autoSaveData: AutoSaveData[];
+  hasUnsavedChanges: boolean;
+  isAutoSaving: boolean;
+  lastAutoSave?: string;
 }

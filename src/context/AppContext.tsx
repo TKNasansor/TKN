@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { AppState, Building, Part, PartInstallation, ManualPartInstallation, Update, Income, User, AppSettings, FaultReport, MaintenanceReceipt, MaintenanceHistory, Printer, MaintenanceRecord, SMSTemplate, Proposal, ProposalItem, Payment, DebtRecord, ProposalTemplate, ProposalField } from '../types';
+import { AppState, Building, Part, PartInstallation, ManualPartInstallation, Update, Income, User, AppSettings, FaultReport, MaintenanceReceipt, MaintenanceHistory, Printer, MaintenanceRecord, SMSTemplate, Proposal, ProposalItem, Payment, DebtRecord, ProposalTemplate, ProposalField, QRCodeData, NotificationData, AutoSaveData } from '../types';
 
 const initialSettings: AppSettings = {
   appTitle: 'Asansör Bakım Takip',
@@ -14,6 +14,7 @@ const initialSettings: AppSettings = {
     ilce: 'Kadıköy',
     binaNo: '123'
   },
+  autoSaveInterval: 60,
   receiptTemplate: `
     <div class="receipt">
       <div class="header">
@@ -337,6 +338,12 @@ const initialAppState: AppState = {
   payments: [],
   debtRecords: [],
   proposalTemplates: initialProposalTemplates,
+  qrCodes: [],
+  systemNotifications: [],
+  autoSaveData: [],
+  hasUnsavedChanges: false,
+  isAutoSaving: false,
+  lastAutoSave: undefined,
 };
 
 interface AppContextProps {
@@ -376,6 +383,12 @@ interface AppContextProps {
   addProposalTemplate: (template: Omit<ProposalTemplate, 'id'>) => void;
   updateProposalTemplate: (template: ProposalTemplate) => void;
   deleteProposalTemplate: (id: string) => void;
+  addSystemNotification: (notification: Omit<NotificationData, 'id' | 'timestamp'>) => void;
+  markNotificationAsRead: (notificationId: string) => void;
+  updateAutoSaveData: (data: AutoSaveData) => void;
+  setUnsavedChanges: (hasChanges: boolean) => void;
+  setAutoSaving: (isSaving: boolean) => void;
+  reportFault: (buildingId: string, faultData: { description: string; severity: 'low' | 'medium' | 'high'; reportedBy: string }) => void;
 }
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
@@ -399,14 +412,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             },
             elevatorCount: building.elevatorCount || 1,
             label: building.label || null,
-            defectiveNote: building.defectiveNote || undefined
+            defectiveNote: building.defectiveNote || undefined,
+            faultSeverity: building.faultSeverity || undefined,
+            faultTimestamp: building.faultTimestamp || undefined,
+            faultReportedBy: building.faultReportedBy || undefined
           };
         }
         return {
           ...building,
           elevatorCount: building.elevatorCount || 1,
           label: building.label || null,
-          defectiveNote: building.defectiveNote || undefined
+          defectiveNote: building.defectiveNote || undefined,
+          faultSeverity: building.faultSeverity || undefined,
+          faultTimestamp: building.faultTimestamp || undefined,
+          faultReportedBy: building.faultReportedBy || undefined
         };
       }) || [];
       
@@ -420,7 +439,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           companyAddress: parsedState.settings?.companyAddress || initialSettings.companyAddress,
           installationProposalTemplate: parsedState.settings?.installationProposalTemplate || initialSettings.installationProposalTemplate,
           maintenanceProposalTemplate: parsedState.settings?.maintenanceProposalTemplate || initialSettings.maintenanceProposalTemplate,
-          revisionProposalTemplate: parsedState.settings?.revisionProposalTemplate || initialSettings.revisionProposalTemplate
+          revisionProposalTemplate: parsedState.settings?.revisionProposalTemplate || initialSettings.revisionProposalTemplate,
+          autoSaveInterval: parsedState.settings?.autoSaveInterval || 60
         },
         maintenanceRecords: parsedState.maintenanceRecords || [],
         smsTemplates: parsedState.smsTemplates || [],
@@ -428,7 +448,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         payments: parsedState.payments || [],
         manualPartInstallations: parsedState.manualPartInstallations || [],
         debtRecords: parsedState.debtRecords || [],
-        proposalTemplates: parsedState.proposalTemplates || initialProposalTemplates
+        proposalTemplates: parsedState.proposalTemplates || initialProposalTemplates,
+        qrCodes: parsedState.qrCodes || [],
+        systemNotifications: parsedState.systemNotifications || [],
+        autoSaveData: parsedState.autoSaveData || [],
+        hasUnsavedChanges: false,
+        isAutoSaving: false,
+        lastAutoSave: parsedState.lastAutoSave
       };
     }
     return initialAppState;
@@ -470,6 +496,92 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     localStorage.setItem('appState', JSON.stringify(state));
   }, [state]);
+
+  const addSystemNotification = (notification: Omit<NotificationData, 'id' | 'timestamp'>) => {
+    const newNotification: NotificationData = {
+      ...notification,
+      id: uuidv4(),
+      timestamp: new Date().toISOString()
+    };
+
+    setState(prev => ({
+      ...prev,
+      systemNotifications: [newNotification, ...prev.systemNotifications],
+      unreadNotifications: prev.unreadNotifications + 1
+    }));
+  };
+
+  const markNotificationAsRead = (notificationId: string) => {
+    setState(prev => ({
+      ...prev,
+      systemNotifications: prev.systemNotifications.map(notification =>
+        notification.id === notificationId
+          ? { ...notification, isRead: true }
+          : notification
+      )
+    }));
+  };
+
+  const updateAutoSaveData = (data: AutoSaveData) => {
+    setState(prev => ({
+      ...prev,
+      autoSaveData: [data, ...prev.autoSaveData.filter(item => 
+        !(item.formType === data.formType && item.userId === data.userId)
+      )],
+      lastAutoSave: data.timestamp
+    }));
+  };
+
+  const setUnsavedChanges = (hasChanges: boolean) => {
+    setState(prev => ({
+      ...prev,
+      hasUnsavedChanges: hasChanges
+    }));
+  };
+
+  const setAutoSaving = (isSaving: boolean) => {
+    setState(prev => ({
+      ...prev,
+      isAutoSaving: isSaving
+    }));
+  };
+
+  const reportFault = (buildingId: string, faultData: { description: string; severity: 'low' | 'medium' | 'high'; reportedBy: string }) => {
+    const building = state.buildings.find(b => b.id === buildingId);
+    if (!building) return;
+
+    const now = new Date().toISOString();
+
+    // Update building with fault information
+    setState(prev => ({
+      ...prev,
+      buildings: prev.buildings.map(b =>
+        b.id === buildingId
+          ? {
+              ...b,
+              isDefective: true,
+              defectiveNote: faultData.description,
+              faultSeverity: faultData.severity,
+              faultTimestamp: now,
+              faultReportedBy: faultData.reportedBy
+            }
+          : b
+      )
+    }));
+
+    // Add system notification
+    addSystemNotification({
+      type: 'fault',
+      title: 'Yeni Arıza Bildirimi',
+      message: `${building.name} binasında ${faultData.severity === 'high' ? 'acil' : faultData.severity === 'medium' ? 'orta öncelikli' : 'düşük öncelikli'} arıza bildirimi alındı.`,
+      severity: faultData.severity,
+      actionRequired: faultData.severity === 'high',
+      relatedId: buildingId,
+      isRead: false
+    });
+
+    addUpdate('Arıza Bildirimi', `${building.name} binasında arıza bildirimi: ${faultData.description.substring(0, 50)}...`);
+  };
 
   const addDebtRecord = (buildingId: string, type: 'maintenance' | 'part' | 'payment', description: string, amount: number, performedBy?: string) => {
     const building = state.buildings.find(b => b.id === buildingId);
@@ -632,7 +744,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         maintenanceDate: now.toISOString(),
         maintenanceTime: now.toLocaleTimeString('tr-TR'),
         elevatorCount: building.elevatorCount,
-        totalFee: totalMaintenanceFee
+        totalFee: totalMaintenanceFee,
+        status: 'completed',
+        priority: 'medium',
+        searchableText: `${building.name} ${state.currentUser.name} bakım`
       };
 
       maintenanceRecords = [record, ...maintenanceRecords];
@@ -1549,7 +1664,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addPayment,
       addProposalTemplate,
       updateProposalTemplate,
-      deleteProposalTemplate
+      deleteProposalTemplate,
+      addSystemNotification,
+      markNotificationAsRead,
+      updateAutoSaveData,
+      setUnsavedChanges,
+      setAutoSaving,
+      reportFault
     }}>
       {children}
     </AppContext.Provider>
