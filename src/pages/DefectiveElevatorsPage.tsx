@@ -173,7 +173,7 @@ const DefectiveElevatorsPage: React.FC = () => {
                         </button>
                       </div>
                     </div>
-                  ) : building.isDefective && building.defectiveNote ? (
+                  ) : (building.isDefective && building.defectiveNote ? (
                     <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-md">
                       <div className="flex justify-between items-start">
                         <div>
@@ -188,7 +188,7 @@ const DefectiveElevatorsPage: React.FC = () => {
                         </button>
                       </div>
                     </div>
-                  )}
+                  ) : null)}
                   
                   {building.notes && (
                     <div className="mt-2 text-sm text-gray-600">
