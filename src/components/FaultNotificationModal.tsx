@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AlertTriangle, Clock, User, FileText, X } from 'lucide-react';
+import { useApp } from '../context/AppContext';
 
 interface FaultNotificationModalProps {
   isOpen: boolean;
@@ -18,19 +19,15 @@ const FaultNotificationModal: React.FC<FaultNotificationModalProps> = ({
   onSubmit,
   onCancel
 }) => {
+  const { state } = useApp();
   const [description, setDescription] = useState('');
   const [severity, setSeverity] = useState<'low' | 'medium' | 'high'>('medium');
-  const [reportedBy, setReportedBy] = useState('');
+  const [reportedBy, setReportedBy] = useState(state.currentUser?.name || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (description.length < 50) {
-      alert('Arıza açıklaması en az 50 karakter olmalıdır.');
-      return;
-    }
-
     if (!reportedBy.trim()) {
       alert('Bildiren kişi bilgisi zorunludur.');
       return;
@@ -48,7 +45,7 @@ const FaultNotificationModal: React.FC<FaultNotificationModalProps> = ({
       // Reset form
       setDescription('');
       setSeverity('medium');
-      setReportedBy('');
+      setReportedBy(state.currentUser?.name || '');
     } catch (error) {
       console.error('Fault report submission failed:', error);
       alert('Arıza bildirimi gönderilirken hata oluştu. Lütfen tekrar deneyin.');
@@ -84,7 +81,7 @@ const FaultNotificationModal: React.FC<FaultNotificationModalProps> = ({
           <div className="flex items-center">
             <AlertTriangle className="h-6 w-6 text-red-600 mr-3" />
             <div>
-              <h2 className="text-lg font-semibold text-red-900">Arıza Bildirimi Zorunlu</h2>
+              <h2 className="text-lg font-semibold text-red-900">Arıza Bildirimi</h2>
               <p className="text-sm text-red-700">{buildingName}</p>
             </div>
           </div>
@@ -102,10 +99,9 @@ const FaultNotificationModal: React.FC<FaultNotificationModalProps> = ({
             <div className="flex items-start">
               <AlertTriangle className="h-5 w-5 text-yellow-600 mr-2 mt-0.5" />
               <div>
-                <h3 className="text-sm font-medium text-yellow-800">Önemli Bilgilendirme</h3>
+                <h3 className="text-sm font-medium text-yellow-800">Arıza Bildirimi</h3>
                 <p className="text-sm text-yellow-700 mt-1">
-                  Bu bina arızalı olarak işaretlenmiştir. Devam etmek için arıza detaylarını eksiksiz olarak doldurmanız gerekmektedir.
-                  Bu işlem tamamlanana kadar diğer işlemler engellenecektir.
+                  Bu bina arızalı olarak işaretlenecektir. Arıza detaylarını doldurabilirsiniz.
                 </p>
               </div>
             </div>
@@ -115,27 +111,19 @@ const FaultNotificationModal: React.FC<FaultNotificationModalProps> = ({
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <FileText className="h-4 w-4 inline mr-1" />
-                Arıza Açıklaması *
+                Arıza Açıklaması
               </label>
               <textarea
                 rows={5}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 ${
-                  description.length < 50 && description.length > 0 ? 'border-red-300' : 'border-gray-300'
-                }`}
-                placeholder="Arızanın detaylı açıklamasını yazın (minimum 50 karakter)..."
-                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                placeholder="Arızanın detaylı açıklamasını yazın (opsiyonel)..."
                 disabled={isSubmitting}
               />
-              <div className="flex justify-between items-center mt-1">
-                <p className={`text-xs ${description.length < 50 ? 'text-red-600' : 'text-green-600'}`}>
-                  {description.length}/50 karakter (minimum)
-                </p>
-                <p className="text-xs text-gray-500">
-                  {description.length} karakter yazıldı
-                </p>
-              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {description.length} karakter yazıldı
+              </p>
             </div>
 
             <div>
@@ -221,7 +209,7 @@ const FaultNotificationModal: React.FC<FaultNotificationModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || description.length < 50 || !reportedBy.trim()}
+              disabled={isSubmitting || !reportedBy.trim()}
               className="px-6 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
             >
               {isSubmitting ? (

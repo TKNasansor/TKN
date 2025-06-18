@@ -243,6 +243,8 @@ export interface QRCodeData {
   customFields: Record<string, any>;
   generatedDate: string;
   isActive: boolean;
+  logoUrl?: string;
+  companyName?: string;
 }
 
 export interface NotificationData {
@@ -263,6 +265,16 @@ export interface AutoSaveData {
   formData: any;
   timestamp: string;
   userId: string;
+}
+
+export interface ArchivedReceipt {
+  id: string;
+  buildingId: string;
+  htmlContent: string;
+  createdDate: string;
+  createdBy: string;
+  maintenanceDate: string;
+  buildingName: string;
 }
 
 export interface AppState {
@@ -297,4 +309,7 @@ export interface AppState {
   lastAutoSave?: string;
   showReceiptModal: boolean;
   receiptModalHtml: string | null;
+  archivedReceipts: ArchivedReceipt[];
+  showPrinterSelectionModal: boolean;
+  printerSelectionContent: string | null;
 }

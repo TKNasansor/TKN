@@ -3,11 +3,12 @@ import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import ReceiptModal from './ReceiptModal';
+import PrinterSelectionModal from './PrinterSelectionModal';
 import { useApp } from '../context/AppContext';
 import UserSelection from './UserSelection';
 
 const Layout: React.FC = () => {
-  const { state, toggleSidebar, closeReceiptModal } = useApp();
+  const { state, toggleSidebar, closeReceiptModal, closePrinterSelection } = useApp();
   
   if (!state.currentUser) {
     return <UserSelection />;
@@ -44,6 +45,13 @@ const Layout: React.FC = () => {
         isOpen={state.showReceiptModal}
         htmlContent={state.receiptModalHtml}
         onClose={closeReceiptModal}
+      />
+
+      {/* Printer Selection Modal */}
+      <PrinterSelectionModal
+        isOpen={state.showPrinterSelectionModal}
+        content={state.printerSelectionContent}
+        onClose={closePrinterSelection}
       />
     </div>
   );

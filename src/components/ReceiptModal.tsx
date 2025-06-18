@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, Printer } from 'lucide-react';
+import { useApp } from '../context/AppContext';
 
 interface ReceiptModalProps {
   isOpen: boolean;
@@ -8,13 +9,11 @@ interface ReceiptModalProps {
 }
 
 const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, htmlContent, onClose }) => {
+  const { showPrinterSelection } = useApp();
+
   const handlePrint = () => {
-    const printWindow = window.open('', '_blank', 'width=900,height=700,scrollbars=yes');
-    if (printWindow && htmlContent) {
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
-      printWindow.focus();
-      printWindow.print();
+    if (htmlContent) {
+      showPrinterSelection(htmlContent);
     }
   };
 

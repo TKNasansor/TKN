@@ -10,7 +10,7 @@ import QRCodeManager from '../components/QRCodeManager';
 import { useAutoSave } from '../hooks/useAutoSave';
 
 const BuildingsPage: React.FC = () => {
-  const { state, addBuilding, deleteBuilding, toggleMaintenance, reportFault } = useApp();
+  const { state, addBuilding, deleteBuilding, toggleMaintenance, reportFault, addQRCodeData } = useApp();
   const [activeTab, setActiveTab] = useState<'all' | 'maintained' | 'unmaintained'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [labelFilter, setLabelFilter] = useState<'all' | 'green' | 'blue' | 'yellow' | 'red' | 'none'>('all');
@@ -217,8 +217,18 @@ const BuildingsPage: React.FC = () => {
   };
 
   const handleQRSave = (qrData: any) => {
-    console.log('QR Code saved:', qrData);
-    // Here you would typically save the QR data to your state
+    const qrCodeData = {
+      id: `qr_${Date.now()}`,
+      buildingId: qrData.buildingId,
+      content: JSON.stringify(qrData),
+      customFields: qrData,
+      generatedDate: new Date().toISOString(),
+      isActive: true,
+      logoUrl: qrData.logoUrl,
+      companyName: qrData.companyName
+    };
+    addQRCodeData(qrCodeData);
+    console.log('QR Code saved:', qrCodeData);
   };
 
   const getFullAddress = (building: Building) => {
@@ -721,9 +731,10 @@ const BuildingsPage: React.FC = () => {
                   
                   <div className="ml-2 md:ml-4 flex-shrink-0 flex items-center space-x-2">
                     {building.label && (
-                      <div className="flex items-center">
-                        <Tag className="h-3 w-3 md:h-4 md:w-4 text-gray-400 mr-1" />
-                        <span className={`inline-block w-2 h-2 md:w-3 md:h-3 rounded-full ${getLabelColor(building.label)}`}></span>
+                      <div className="flex items-center justify-center h-8 w-8 rounded-full">
+                        <div className={`h-6 w-6 rounded-full ${getLabelColor(building.label)} flex items-center justify-center`}>
+                          <Tag className="h-3 w-3 text-white" />
+                        </div>
                       </div>
                     )}
                     {!building.isDefective && (

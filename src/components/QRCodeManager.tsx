@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { QrCode, Edit, Eye, Printer, X, Save, RefreshCw } from 'lucide-react';
+import { useApp } from '../context/AppContext';
 
 interface QRCodeManagerProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
   onClose,
   onSave
 }) => {
+  const { state, showPrinterSelection } = useApp();
   const [step, setStep] = useState<'edit' | 'preview'>('edit');
   const [qrContent, setQrContent] = useState({
     buildingName,
@@ -24,8 +26,7 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
     contactInfo: '',
     emergencyPhone: '112',
     companyPhone: '',
-    customMessage: 'Asansör arızası için QR kodu okutun',
-    includeTimestamp: true
+    customMessage: 'Asansör arızası için QR kodu okutun'
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
@@ -61,8 +62,9 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
       
       const qrData = {
         ...qrContent,
-        generatedAt: new Date().toISOString(),
-        url: `${window.location.origin}/report-fault/${buildingId}`
+        url: `${window.location.origin}/report-fault/${buildingId}`,
+        logoUrl: state.settings?.logo,
+        companyName: state.settings?.companyName
       };
       
       onSave(qrData);
@@ -76,78 +78,77 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
   };
 
   const handlePrint = () => {
-    const printWindow = window.open('', '_blank', 'width=800,height=600');
-    if (printWindow && printRef.current) {
-      const printContent = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>QR Kod - ${qrContent.buildingName}</title>
-            <style>
-              body { 
-                font-family: Arial, sans-serif; 
-                display: flex; 
-                flex-direction: column; 
-                align-items: center; 
-                justify-content: center; 
-                min-height: 100vh; 
-                margin: 0;
-                padding: 20px;
-              }
-              .qr-container { 
-                text-align: center; 
-                border: 2px solid #333;
-                padding: 30px;
-                border-radius: 10px;
-                background: white;
-              }
-              .building-name { 
-                font-size: 24px; 
-                font-weight: bold; 
-                margin-bottom: 20px; 
-                color: #333;
-              }
-              .qr-code { 
-                margin: 20px 0; 
-              }
-              .instructions { 
-                font-size: 16px; 
-                color: #666; 
-                margin-top: 20px;
-                max-width: 300px;
-                line-height: 1.5;
-              }
-              .contact-info {
-                margin-top: 20px;
-                font-size: 14px;
-                color: #888;
-              }
-              @media print {
-                body { margin: 0; }
-                .qr-container { border: 1px solid #333; }
-              }
-            </style>
-          </head>
-          <body>
-            <div class="qr-container">
-              <div class="building-name">${qrContent.buildingName}</div>
-              <div class="qr-code">
-                ${printRef.current.innerHTML}
-              </div>
-              <div class="instructions">${qrContent.customMessage}</div>
-              ${qrContent.companyPhone ? `<div class="contact-info">İletişim: ${qrContent.companyPhone}</div>` : ''}
-              <div class="contact-info">Acil durumlar için: ${qrContent.emergencyPhone}</div>
-              ${qrContent.includeTimestamp ? `<div class="contact-info">Oluşturulma: ${new Date().toLocaleString('tr-TR')}</div>` : ''}
+    if (!printRef.current) return;
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>QR Kod - ${qrContent.buildingName}</title>
+          <style>
+            body { 
+              font-family: Arial, sans-serif; 
+              display: flex; 
+              flex-direction: column; 
+              align-items: center; 
+              justify-content: center; 
+              min-height: 100vh; 
+              margin: 0;
+              padding: 20px;
+            }
+            .qr-container { 
+              text-align: center; 
+              border: 2px solid #333;
+              padding: 30px;
+              border-radius: 10px;
+              background: white;
+            }
+            .company-name { 
+              font-size: 20px; 
+              font-weight: bold; 
+              color: #333;
+              margin-bottom: 10px;
+            }
+            .building-name { 
+              font-size: 24px; 
+              font-weight: bold; 
+              margin-bottom: 20px; 
+              color: #333;
+            }
+            .qr-code { 
+              margin: 20px 0; 
+            }
+            .instructions { 
+              font-size: 16px; 
+              color: #666; 
+              margin-top: 20px;
+              max-width: 300px;
+              line-height: 1.5;
+            }
+            .contact-info {
+              margin-top: 20px;
+              font-size: 14px;
+              color: #888;
+            }
+            @media print { .actions { display: none; } }
+          </style>
+        </head>
+        <body>
+          <div class="qr-container">
+            ${state.settings?.companyName ? `<div class="company-name">${state.settings.companyName}</div>` : ''}
+            <div class="building-name">${qrContent.buildingName}</div>
+            <div class="qr-code">
+              ${printRef.current.innerHTML}
             </div>
-          </body>
-        </html>
-      `;
-      
-      printWindow.document.write(printContent);
-      printWindow.document.close();
-      printWindow.focus();
-      printWindow.print();
-    }
+            <div class="instructions">${qrContent.customMessage}</div>
+            ${qrContent.companyPhone ? `<div class="contact-info">İletişim: ${qrContent.companyPhone}</div>` : ''}
+            <div class="contact-info">Acil durumlar için: ${qrContent.emergencyPhone}</div>
+          </div>
+        </body>
+      </html>
+    `;
+    
+    showPrinterSelection(printContent);
   };
 
   if (!isOpen) return null;
@@ -265,19 +266,6 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
                   placeholder="Ek iletişim bilgisi (opsiyonel)"
                 />
               </div>
-
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  id="includeTimestamp"
-                  checked={qrContent.includeTimestamp}
-                  onChange={(e) => setQrContent(prev => ({ ...prev, includeTimestamp: e.target.checked }))}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <label htmlFor="includeTimestamp" className="ml-2 block text-sm text-gray-900">
-                  Oluşturulma tarihini dahil et
-                </label>
-              </div>
             </div>
 
             <div className="flex justify-end space-x-3 mt-8">
@@ -326,14 +314,25 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
               <h3 className="text-lg font-medium text-gray-900 mb-4">QR Kod Önizlemesi</h3>
               
               <div className="inline-block p-6 border-2 border-gray-300 rounded-lg bg-white">
+                {state.settings?.companyName && (
+                  <div className="text-lg font-bold text-gray-900 mb-2">{state.settings.companyName}</div>
+                )}
                 <div className="text-xl font-bold text-gray-900 mb-4">{qrContent.buildingName}</div>
                 
-                <div ref={printRef} className="mb-4">
+                <div ref={printRef} className="mb-4 relative">
                   <QRCodeSVG
                     value={`${window.location.origin}/report-fault/${buildingId}`}
                     size={200}
                     level="H"
                     includeMargin={true}
+                    imageSettings={state.settings?.logo ? {
+                      src: state.settings.logo,
+                      x: undefined,
+                      y: undefined,
+                      height: 40,
+                      width: 40,
+                      excavate: true,
+                    } : undefined}
                   />
                 </div>
                 
