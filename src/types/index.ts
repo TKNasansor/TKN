@@ -19,6 +19,7 @@ export interface Building {
   lastMaintenanceDate?: string;
   lastMaintenanceTime?: string;
   isDefective?: boolean;
+  defectiveNote?: string; // Arıza notu
   label?: 'green' | 'blue' | 'yellow' | 'red' | null;
 }
 
@@ -171,6 +172,17 @@ export interface ProposalTemplate {
   content: string;
   fields: ProposalField[];
   fileAttachment?: string;
+  documentFile?: string; // Word/PDF dosyası
+  fillableFields?: TemplateField[]; // Doldurulabilir alanlar
+}
+
+export interface TemplateField {
+  id: string;
+  name: string;
+  label: string;
+  type: 'text' | 'number' | 'date' | 'textarea';
+  placeholder?: string;
+  required: boolean;
 }
 
 export interface ProposalField {
@@ -190,12 +202,14 @@ export interface Proposal {
   title: string;
   description: string;
   fieldValues: Record<string, any>;
+  templateFieldValues?: Record<string, any>; // Şablon alanları için değerler
   items: ProposalItem[];
   totalAmount: number;
   createdDate: string;
   createdBy: string;
   status: 'draft' | 'sent' | 'accepted' | 'rejected';
   pdfAttachment?: string;
+  generatedDocument?: string; // Oluşturulan belge
 }
 
 export interface ProposalItem {

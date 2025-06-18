@@ -34,11 +34,14 @@ const SettingsPage: React.FC = () => {
     type: 'installation' as 'installation' | 'maintenance' | 'revision',
     name: '',
     content: '',
-    fields: [] as any[]
+    fields: [] as any[],
+    documentFile: '',
+    fillableFields: [] as any[]
   });
   
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const documentInputRef = useRef<HTMLInputElement>(null);
 
   const handleTitleSave = () => {
     if (newTitle.trim()) {
@@ -78,6 +81,23 @@ const SettingsPage: React.FC = () => {
     }
   };
 
+  const handleDocumentUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && (file.type === 'application/pdf' || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || file.type === 'application/msword')) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        setProposalTemplateForm(prev => ({
+          ...prev,
+          documentFile: base64String
+        }));
+      };
+      reader.readAsDataURL(file);
+    } else {
+      alert('Lütfen sadece Word (.docx, .doc) veya PDF dosyası yükleyin.');
+    }
+  };
+
   const handleAddressChange = (field: string, value: string) => {
     setCompanyInfo(prev => ({
       ...prev,
@@ -92,6 +112,35 @@ const SettingsPage: React.FC = () => {
     if (!state.settings?.companyAddress) return 'Belirtilmemiş';
     const { mahalle, sokak, binaNo, ilce, il } = state.settings.companyAddress;
     return `${mahalle} ${sokak} ${binaNo}, ${ilce}/${il}`.trim();
+  };
+
+  const addFillableField = () => {
+    const newField = {
+      id: `field_${Date.now()}`,
+      name: '',
+      label: '',
+      type: 'text',
+      required: false,
+      placeholder: ''
+    };
+    setProposalTemplateForm(prev => ({
+      ...prev,
+      fillableFields: [...prev.fillableFields, newField]
+    }));
+  };
+
+  const updateFillableField = (index: number, field: string, value: any) => {
+    setProposalTemplateForm(prev => ({
+      ...prev,
+      fillableFields: prev.fillableFields.map((f, i) => i === index ? { ...f, [field]: value } : f)
+    }));
+  };
+
+  const removeFillableField = (index: number) => {
+    setProposalTemplateForm(prev => ({
+      ...prev,
+      fillableFields: prev.fillableFields.filter((_, i) => i !== index)
+    }));
   };
 
   const addField = () => {
@@ -135,7 +184,9 @@ const SettingsPage: React.FC = () => {
       type: 'installation',
       name: '',
       content: '',
-      fields: []
+      fields: [],
+      documentFile: '',
+      fillableFields: []
     });
     setShowProposalTemplateForm(false);
   };
@@ -145,7 +196,9 @@ const SettingsPage: React.FC = () => {
       type: template.type,
       name: template.name,
       content: template.content,
-      fields: template.fields
+      fields: template.fields,
+      documentFile: template.documentFile || '',
+      fillableFields: template.fillableFields || []
     });
     setEditingProposalTemplate(template.id);
     setShowProposalTemplateForm(true);
@@ -552,7 +605,7 @@ const SettingsPage: React.FC = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <FileText className="h-5 w-5 text-gray-500 mr-2" />
-                <h3 className="text-lg font-medium text-gray-900">Teklif Şablonları</h3>
+                <h3 className="text-lg font-medium text-gray-900">Teklif Şablonları (Word/PDF)</h3>
               </div>
               <button
                 onClick={() => setShowProposalTemplateForm(true)}
@@ -577,8 +630,11 @@ const SettingsPage: React.FC = () => {
                            template.type === 'maintenance' ? 'Bakım Sözleşmesi' : 'Revizyon Teklifi'}
                         </p>
                         <p className="text-xs text-gray-500 mt-1">
-                          {template.fields.length} özel alan
+                          {template.fillableFields?.length || 0} doldurulabilir alan
                         </p>
+                        {template.documentFile && (
+                          <p className="text-xs text-green-600 mt-1">✓ Belge yüklendi</p>
+                        )}
                       </div>
                       <div className="flex space-x-2">
                         <button
@@ -645,7 +701,7 @@ const SettingsPage: React.FC = () => {
       {/* Proposal Template Form Modal */}
       {showProposalTemplateForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b border-gray-200 px-6 py-4">
               <h2 className="text-lg font-medium text-gray-800">
                 {editingProposalTemplate ? 'Şablon Düzenle' : 'Yeni Teklif Şablonu'}
@@ -658,7 +714,9 @@ const SettingsPage: React.FC = () => {
                     type: 'installation',
                     name: '',
                     content: '',
-                    fields: []
+                    fields: [],
+                    documentFile: '',
+                    fillableFields: []
                   });
                 }}
                 className="text-gray-400 hover:text-gray-500"
@@ -668,53 +726,87 @@ const SettingsPage: React.FC = () => {
             </div>
             
             <form onSubmit={handleProposalTemplateSubmit} className="p-6">
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Şablon Adı
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    value={proposalTemplateForm.name}
-                    onChange={(e) => setProposalTemplateForm(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Şablon adı"
-                  />
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Şablon Adı
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      value={proposalTemplateForm.name}
+                      onChange={(e) => setProposalTemplateForm(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="Şablon adı"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Teklif Türü
+                    </label>
+                    <select
+                      value={proposalTemplateForm.type}
+                      onChange={(e) => setProposalTemplateForm(prev => ({ ...prev, type: e.target.value as any }))}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="installation">Montaj Teklifi</option>
+                      <option value="maintenance">Bakım Sözleşmesi</option>
+                      <option value="revision">Revizyon Teklifi</option>
+                    </select>
+                  </div>
                 </div>
-                
+
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Teklif Türü
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Word/PDF Belge Yükle
                   </label>
-                  <select
-                    value={proposalTemplateForm.type}
-                    onChange={(e) => setProposalTemplateForm(prev => ({ ...prev, type: e.target.value as any }))}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="installation">Montaj Teklifi</option>
-                    <option value="maintenance">Bakım Sözleşmesi</option>
-                    <option value="revision">Revizyon Teklifi</option>
-                  </select>
+                  <div className="flex items-center space-x-4">
+                    <button
+                      type="button"
+                      onClick={() => documentInputRef.current?.click()}
+                      className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Belge Yükle
+                    </button>
+                    {proposalTemplateForm.documentFile && (
+                      <span className="text-sm text-green-600">✓ Belge yüklendi</span>
+                    )}
+                    <input
+                      ref={documentInputRef}
+                      type="file"
+                      accept=".doc,.docx,.pdf"
+                      className="hidden"
+                      onChange={handleDocumentUpload}
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Word (.doc, .docx) veya PDF dosyası yükleyebilirsiniz
+                  </p>
                 </div>
 
                 <div>
                   <div className="flex justify-between items-center mb-2">
                     <label className="block text-sm font-medium text-gray-700">
-                      Özel Alanlar
+                      Doldurulabilir Alanlar
                     </label>
                     <button
                       type="button"
-                      onClick={addField}
+                      onClick={addFillableField}
                       className="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded hover:bg-blue-200"
                     >
                       <Plus className="h-3 w-3 mr-1" />
                       Alan Ekle
                     </button>
                   </div>
+                  <p className="text-xs text-gray-500 mb-3">
+                    Bu alanlar teklif oluştururken doldurulacak ve belgeye yerleştirilecektir.
+                  </p>
                   
                   <div className="space-y-3">
-                    {proposalTemplateForm.fields.map((field, index) => (
+                    {proposalTemplateForm.fillableFields.map((field, index) => (
                       <div key={index} className="border border-gray-200 rounded-lg p-3">
                         <div className="grid grid-cols-2 gap-3">
                           <div>
@@ -722,7 +814,7 @@ const SettingsPage: React.FC = () => {
                             <input
                               type="text"
                               value={field.name}
-                              onChange={(e) => updateField(index, 'name', e.target.value)}
+                              onChange={(e) => updateFillableField(index, 'name', e.target.value)}
                               className="mt-1 block w-full px-2 py-1 border border-gray-300 rounded text-sm"
                               placeholder="alan_adi"
                             />
@@ -732,7 +824,7 @@ const SettingsPage: React.FC = () => {
                             <input
                               type="text"
                               value={field.label}
-                              onChange={(e) => updateField(index, 'label', e.target.value)}
+                              onChange={(e) => updateFillableField(index, 'label', e.target.value)}
                               className="mt-1 block w-full px-2 py-1 border border-gray-300 rounded text-sm"
                               placeholder="Alan Etiketi"
                             />
@@ -741,7 +833,7 @@ const SettingsPage: React.FC = () => {
                             <label className="block text-xs font-medium text-gray-600">Tip</label>
                             <select
                               value={field.type}
-                              onChange={(e) => updateField(index, 'type', e.target.value)}
+                              onChange={(e) => updateFillableField(index, 'type', e.target.value)}
                               className="mt-1 block w-full px-2 py-1 border border-gray-300 rounded text-sm"
                             >
                               <option value="text">Metin</option>
@@ -755,14 +847,14 @@ const SettingsPage: React.FC = () => {
                               <input
                                 type="checkbox"
                                 checked={field.required}
-                                onChange={(e) => updateField(index, 'required', e.target.checked)}
+                                onChange={(e) => updateFillableField(index, 'required', e.target.checked)}
                                 className="h-3 w-3 text-blue-600"
                               />
                               <span className="ml-1 text-xs text-gray-600">Zorunlu</span>
                             </label>
                             <button
                               type="button"
-                              onClick={() => removeField(index)}
+                              onClick={() => removeFillableField(index)}
                               className="p-1 text-red-600 hover:text-red-800"
                             >
                               <X className="h-3 w-3" />
@@ -773,7 +865,7 @@ const SettingsPage: React.FC = () => {
                           <input
                             type="text"
                             value={field.placeholder}
-                            onChange={(e) => updateField(index, 'placeholder', e.target.value)}
+                            onChange={(e) => updateFillableField(index, 'placeholder', e.target.value)}
                             className="block w-full px-2 py-1 border border-gray-300 rounded text-sm"
                             placeholder="Placeholder metni"
                           />

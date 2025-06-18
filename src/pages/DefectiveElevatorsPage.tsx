@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { AlertTriangle, Building2, Phone, Check } from 'lucide-react';
+import { AlertTriangle, Building2, Phone, Check, Edit, Save, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const DefectiveElevatorsPage: React.FC = () => {
   const { state, updateBuilding } = useApp();
   const [showAllBuildings, setShowAllBuildings] = useState(true);
+  const [editingNote, setEditingNote] = useState<string | null>(null);
+  const [noteText, setNoteText] = useState('');
   
   const getFullAddress = (address: any) => {
     if (typeof address === 'string') {
@@ -38,9 +40,35 @@ const DefectiveElevatorsPage: React.FC = () => {
     if (building) {
       updateBuilding({
         ...building,
-        isDefective: false
+        isDefective: false,
+        defectiveNote: undefined
       });
     }
+  };
+
+  const handleEditNote = (buildingId: string) => {
+    const building = state.buildings.find(b => b.id === buildingId);
+    if (building) {
+      setEditingNote(buildingId);
+      setNoteText(building.defectiveNote || '');
+    }
+  };
+
+  const handleSaveNote = (buildingId: string) => {
+    const building = state.buildings.find(b => b.id === buildingId);
+    if (building) {
+      updateBuilding({
+        ...building,
+        defectiveNote: noteText.trim() || undefined
+      });
+      setEditingNote(null);
+      setNoteText('');
+    }
+  };
+
+  const handleCancelNote = () => {
+    setEditingNote(null);
+    setNoteText('');
   };
   
   const defectiveElevators = state.buildings.filter(building => building.isDefective);
@@ -72,24 +100,35 @@ const DefectiveElevatorsPage: React.FC = () => {
                     <Link to={`/buildings/${building.id}`} className="text-lg font-medium text-blue-600 hover:text-blue-800">
                       {building.name}
                     </Link>
-                    {showAllBuildings ? (
-                      !building.isDefective && (
+                    <div className="flex space-x-2">
+                      {building.isDefective && (
                         <button
-                          onClick={() => handleMarkAsDefective(building.id)}
-                          className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+                          onClick={() => handleEditNote(building.id)}
+                          className="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
                         >
-                          Arızalı Olarak İşaretle
+                          <Edit className="h-3 w-3 mr-1" />
+                          Arıza Notu
                         </button>
-                      )
-                    ) : (
-                      <button
-                        onClick={() => handleFixElevator(building.id)}
-                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                      >
-                        <Check className="h-4 w-4 mr-1" />
-                        Arıza Çözüldü
-                      </button>
-                    )}
+                      )}
+                      {showAllBuildings ? (
+                        !building.isDefective && (
+                          <button
+                            onClick={() => handleMarkAsDefective(building.id)}
+                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+                          >
+                            Arızalı Olarak İşaretle
+                          </button>
+                        )
+                      ) : (
+                        <button
+                          onClick={() => handleFixElevator(building.id)}
+                          className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                        >
+                          <Check className="h-4 w-4 mr-1" />
+                          Arıza Çözüldü
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="mt-2 flex flex-col sm:flex-row sm:flex-wrap">
                     <div className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0 sm:mr-6">
@@ -103,6 +142,54 @@ const DefectiveElevatorsPage: React.FC = () => {
                       </div>
                     )}
                   </div>
+                  
+                  {/* Arıza Notu Düzenleme */}
+                  {editingNote === building.id ? (
+                    <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-md">
+                      <label className="block text-sm font-medium text-orange-800 mb-2">
+                        Arıza Açıklaması
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={noteText}
+                        onChange={(e) => setNoteText(e.target.value)}
+                        className="w-full px-3 py-2 border border-orange-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                        placeholder="Arızanın detaylarını yazın..."
+                      />
+                      <div className="mt-2 flex space-x-2">
+                        <button
+                          onClick={() => handleSaveNote(building.id)}
+                          className="inline-flex items-center px-3 py-1 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700"
+                        >
+                          <Save className="h-3 w-3 mr-1" />
+                          Kaydet
+                        </button>
+                        <button
+                          onClick={handleCancelNote}
+                          className="inline-flex items-center px-3 py-1 text-xs font-medium text-gray-700 bg-gray-200 rounded hover:bg-gray-300"
+                        >
+                          <X className="h-3 w-3 mr-1" />
+                          İptal
+                        </button>
+                      </div>
+                    </div>
+                  ) : building.isDefective && building.defectiveNote ? (
+                    <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-md">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="text-sm font-medium text-orange-800">Arıza Açıklaması:</h4>
+                          <p className="text-sm text-orange-700 mt-1">{building.defectiveNote}</p>
+                        </div>
+                        <button
+                          onClick={() => handleEditNote(building.id)}
+                          className="p-1 text-orange-600 hover:text-orange-800"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  
                   {building.notes && (
                     <div className="mt-2 text-sm text-gray-600">
                       <p>Not: {building.notes}</p>

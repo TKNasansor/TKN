@@ -285,7 +285,8 @@ const initialProposalTemplates: ProposalTemplate[] = [
       { id: 'capacity', name: 'capacity', label: 'Kapasite (kg)', type: 'number', required: true, placeholder: '630' },
       { id: 'floors', name: 'floors', label: 'Kat Sayısı', type: 'number', required: true, placeholder: '5' },
       { id: 'installation_time', name: 'installation_time', label: 'Montaj Süresi', type: 'text', required: false, placeholder: '15 gün' }
-    ]
+    ],
+    fillableFields: []
   },
   {
     id: 'maintenance-template-1',
@@ -296,7 +297,8 @@ const initialProposalTemplates: ProposalTemplate[] = [
       { id: 'contract_duration', name: 'contract_duration', label: 'Sözleşme Süresi', type: 'text', required: true, placeholder: '12 ay' },
       { id: 'visit_frequency', name: 'visit_frequency', label: 'Ziyaret Sıklığı', type: 'text', required: true, placeholder: 'Ayda 1 kez' },
       { id: 'emergency_service', name: 'emergency_service', label: 'Acil Servis', type: 'text', required: false, placeholder: '7/24' }
-    ]
+    ],
+    fillableFields: []
   },
   {
     id: 'revision-template-1',
@@ -307,7 +309,8 @@ const initialProposalTemplates: ProposalTemplate[] = [
       { id: 'current_age', name: 'current_age', label: 'Mevcut Asansör Yaşı', type: 'number', required: true, placeholder: '15' },
       { id: 'revision_scope', name: 'revision_scope', label: 'Revizyon Kapsamı', type: 'textarea', required: true, placeholder: 'Makine dairesi yenileme, kabin modernizasyonu' },
       { id: 'completion_time', name: 'completion_time', label: 'Tamamlanma Süresi', type: 'text', required: false, placeholder: '30 gün' }
-    ]
+    ],
+    fillableFields: []
   }
 ];
 
@@ -395,13 +398,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               binaNo: ''
             },
             elevatorCount: building.elevatorCount || 1,
-            label: building.label || null
+            label: building.label || null,
+            defectiveNote: building.defectiveNote || undefined
           };
         }
         return {
           ...building,
           elevatorCount: building.elevatorCount || 1,
-          label: building.label || null
+          label: building.label || null,
+          defectiveNote: building.defectiveNote || undefined
         };
       }) || [];
       
@@ -960,49 +965,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ${receiptContent}
           <div class="actions">
             <button class="btn btn-print" onclick="window.print();">Fişi Yazdır</button>
-            <button class="btn btn-cancel" onclick="document.getElementById('receipt-modal').style.display='none';">İptal</button>
+            <button class="btn btn-cancel" onclick="window.close();">İptal</button>
           </div>
         </body>
       </html>
     `;
 
-    // Show receipt in modal instead of new window
-    const modal = document.createElement('div');
-    modal.id = 'receipt-modal';
-    modal.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0,0,0,0.8);
-      z-index: 10000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    `;
-    
-    const iframe = document.createElement('iframe');
-    iframe.style.cssText = `
-      width: 100%;
-      height: 100%;
-      max-width: 900px;
-      max-height: 90vh;
-      border: none;
-      border-radius: 8px;
-      background: white;
-    `;
-    
-    modal.appendChild(iframe);
-    document.body.appendChild(modal);
-    
-    iframe.onload = () => {
-      iframe.contentDocument?.write(fullReceiptHTML);
-      iframe.contentDocument?.close();
-    };
-    
-    iframe.src = 'about:blank';
+    // Show receipt in new window that stays within the app context
+    const receiptWindow = window.open('', '_blank', 'width=900,height=700,scrollbars=yes');
+    if (receiptWindow) {
+      receiptWindow.document.write(fullReceiptHTML);
+      receiptWindow.document.close();
+      receiptWindow.focus();
+    }
 
     // Save receipt to history
     const receipt: MaintenanceReceipt = {
