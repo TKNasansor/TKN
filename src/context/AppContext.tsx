@@ -19,15 +19,21 @@ const initialSettings: AppSettings = {
     <div class="receipt">
       <div class="header">
         <div class="company-info">
-          {{LOGO}}
-          <div class="company-name">{{COMPANY_NAME}}</div>
+          <div class="logo-section">
+            {{LOGO}}
+          </div>
           <div class="company-details">
-            <div>{{COMPANY_ADDRESS}}</div>
-            <div>{{COMPANY_PHONE}}</div>
+            <div class="company-name">{{COMPANY_NAME}}</div>
+            <div class="certifications">CE Belgesi | ISO 9001:2015</div>
           </div>
         </div>
-        <div class="date-info">
-          <div><strong>Tarih:</strong> {{DATE}}</div>
+        <div class="address-info">
+          <div class="address-label">Firma Adresi:</div>
+          <div class="address-text">{{COMPANY_ADDRESS}}</div>
+          <div class="phone-text">{{COMPANY_PHONE}}</div>
+          <div class="date-info">
+            <strong>Tarih:</strong> {{DATE}}
+          </div>
         </div>
       </div>
       
@@ -68,26 +74,17 @@ const initialSettings: AppSettings = {
       </div>
       
       <div class="warnings">
-        <div class="warning-title">ÖNEMLI UYARILAR:</div>
+        <div class="warning-title">ÖNEMLI UYARILAR</div>
         <div class="warning-text">
           <strong>NOT:</strong> Bu bakımdan sonra meydana gelebilecek kapı camı kırılması, tavan aydınlatmasının kırılması durumlarında durumu hemen firmamıza bildiriniz, kırık kapı camı ile asansörü çalıştırmayınız. Aksi takdirde olabilecek durumlardan firmamız sorumlu olmayacaktır.
         </div>
         <div class="warning-text">
-          <strong>!!!</strong> Asansör bakımı esnasında değiştirilmesi önerilen parçaların apartman yönetimi tarafından parça değişimine onay verilmemesi durumunda doğacak aksaklık ve kazalardan firmamız sorumlu değildir.
-        </div>
-      </div>
-      
-      <div class="signature">
-        <div style="border-top: 1px solid #333; width: 200px; margin-left: auto; padding-top: 10px;">
-          Teknisyen İmzası
+          <strong>DİKKAT:</strong> Asansör bakımı esnasında değiştirilmesi önerilen parçaların apartman yönetimi tarafından parça değişimine onay verilmemesi durumunda doğacak aksaklık ve kazalardan firmamız sorumlu değildir.
         </div>
       </div>
       
       <div class="footer">
-        <div>Teşekkür ederiz</div>
-        <div style="margin-top: 10px; font-size: 14px; color: #666;">
-          {{TIMESTAMP}}
-        </div>
+        <div class="thank-you">Teşekkür ederiz</div>
       </div>
     </div>
   `,
@@ -229,6 +226,20 @@ const initialSettings: AppSettings = {
   faultReportTemplate: `
     <div class="fault-report">
       <div class="header">
+        <div class="logo-section">
+          {{LOGO}}
+        </div>
+        <div class="company-details">
+          <div class="company-name">{{COMPANY_NAME}}</div>
+          <div class="certifications">CE Belgesi | ISO 9001:2015</div>
+        </div>
+        <div class="address-info">
+          <div class="address-text">{{COMPANY_ADDRESS}}</div>
+          <div class="phone-text">{{COMPANY_PHONE}}</div>
+        </div>
+      </div>
+      
+      <div class="report-title">
         <h1>Asansör Arıza Bildirimi</h1>
       </div>
       
@@ -728,8 +739,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .replace(/{{MAINTENANCE_ACTION}}/g, building.elevatorCount > 1 ? 'Bakımlar Yapıldı' : 'Bakım Yapıldı')
       .replace(/{{TECHNICIAN}}/g, state.currentUser.name)
       .replace(/{{MAINTENANCE_FEE}}/g, `${building.elevatorCount} x ${building.maintenanceFee.toLocaleString('tr-TR')} ₺ = ${totalMaintenanceFee.toLocaleString('tr-TR')} ₺`)
-      .replace(/{{TOTAL_AMOUNT}}/g, `${grandTotal.toLocaleString('tr-TR')} ₺`)
-      .replace(/{{TIMESTAMP}}/g, `${now.toLocaleDateString('tr-TR')} ${now.toLocaleTimeString('tr-TR')}`);
+      .replace(/{{TOTAL_AMOUNT}}/g, `${grandTotal.toLocaleString('tr-TR')} ₺`);
 
     // Handle parts section
     let partsSection = '';
@@ -806,27 +816,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
             .company-info {
               flex: 1;
-              position: relative;
+              text-align: center;
+            }
+            .logo-section {
+              margin-bottom: 15px;
             }
             .logo { 
-              max-height: 60px; 
-              margin-bottom: 10px; 
-            }
-            .company-name { 
-              font-size: 24px; 
-              font-weight: bold; 
-              color: #333; 
-              margin: 10px 0;
+              max-height: 80px; 
+              max-width: 200px;
+              margin: 0 auto;
+              display: block;
             }
             .company-details {
+              text-align: center;
+            }
+            .company-name { 
+              font-size: 28px; 
+              font-weight: bold; 
+              color: #333; 
+              margin: 15px 0 10px 0;
+            }
+            .certifications {
               font-size: 14px;
               color: #666;
+              font-weight: bold;
+              margin-bottom: 10px;
+            }
+            .address-info {
+              text-align: right;
+              font-size: 14px;
+              color: #333;
+              min-width: 200px;
+            }
+            .address-label {
+              font-weight: bold;
+              margin-bottom: 5px;
+            }
+            .address-text {
+              margin-bottom: 5px;
               line-height: 1.4;
             }
+            .phone-text {
+              margin-bottom: 10px;
+              font-weight: bold;
+            }
             .date-info {
-              text-align: right;
               font-size: 16px;
-              color: #333;
+              font-weight: bold;
             }
             .content { 
               margin-bottom: 30px; 
@@ -897,14 +933,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               border-left: 4px solid #f59e0b;
             }
             .warning-title {
+              font-size: 18px;
               font-weight: bold;
               color: #92400e;
-              margin-bottom: 10px;
+              margin-bottom: 15px;
+              text-align: center;
             }
             .warning-text {
-              font-size: 12px;
+              font-size: 14px;
               color: #92400e;
-              line-height: 1.5;
+              line-height: 1.6;
               margin-bottom: 15px;
             }
             .footer { 
@@ -913,9 +951,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               text-align: center; 
               margin-top: 30px;
             }
-            .signature {
-              margin-top: 40px;
-              text-align: right;
+            .thank-you {
+              font-size: 18px;
+              font-weight: bold;
+              color: #333;
             }
             @media print {
               body { background: white; }

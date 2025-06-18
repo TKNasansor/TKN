@@ -70,6 +70,30 @@ const FaultReportPage: React.FC = () => {
       setIsSubmitting(false);
     }
   };
+
+  // Generate page content using template
+  const generatePageContent = () => {
+    const template = state.settings?.faultReportTemplate || '';
+    const companyAddress = state.settings?.companyAddress ? 
+      `${state.settings.companyAddress.mahalle} ${state.settings.companyAddress.sokak} ${state.settings.companyAddress.binaNo}, ${state.settings.companyAddress.ilce}/${state.settings.companyAddress.il}` : 
+      'Adres belirtilmemiş';
+
+    const buildingAddress = building.address ? 
+      `${building.address.mahalle} ${building.address.sokak} ${building.address.binaNo}, ${building.address.ilce}/${building.address.il}` : 
+      'Adres belirtilmemiş';
+
+    return template
+      .replace(/{{LOGO}}/g, state.settings?.logo ? `<img src="${state.settings.logo}" alt="Logo" class="logo">` : '')
+      .replace(/{{COMPANY_NAME}}/g, state.settings?.companyName || 'Asansör Bakım Servisi')
+      .replace(/{{COMPANY_ADDRESS}}/g, companyAddress)
+      .replace(/{{COMPANY_PHONE}}/g, state.settings?.companyPhone || '0555 123 45 67')
+      .replace(/{{BUILDING_NAME}}/g, building.name)
+      .replace(/{{BUILDING_ADDRESS}}/g, buildingAddress)
+      .replace(/{{REPORTER_NAME}}/g, isSubmitted ? `${formData.reporterName} ${formData.reporterSurname}` : '')
+      .replace(/{{REPORTER_PHONE}}/g, isSubmitted ? formData.reporterPhone : '')
+      .replace(/{{APARTMENT_NO}}/g, isSubmitted ? formData.apartmentNo : '')
+      .replace(/{{DESCRIPTION}}/g, isSubmitted ? formData.description : '');
+  };
   
   if (isSubmitted) {
     return (
@@ -105,24 +129,113 @@ const FaultReportPage: React.FC = () => {
   
   return (
     <div className="min-h-screen bg-gray-100 py-8 px-4">
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          .fault-report {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+          }
+          .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 20px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #333;
+          }
+          .logo-section {
+            flex: 1;
+          }
+          .logo {
+            max-height: 60px;
+            max-width: 150px;
+          }
+          .company-details {
+            flex: 2;
+            text-align: center;
+          }
+          .company-name {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            margin: 10px 0;
+          }
+          .certifications {
+            font-size: 12px;
+            color: #666;
+            font-weight: bold;
+          }
+          .address-info {
+            flex: 1;
+            text-align: right;
+            font-size: 12px;
+            color: #666;
+          }
+          .address-text {
+            margin-bottom: 5px;
+            line-height: 1.4;
+          }
+          .phone-text {
+            font-weight: bold;
+          }
+          .report-title {
+            text-align: center;
+            padding: 20px;
+            background: #dc2626;
+            color: white;
+          }
+          .report-title h1 {
+            margin: 0;
+            font-size: 20px;
+          }
+          .building-info {
+            padding: 20px;
+            background: #f3f4f6;
+            border-bottom: 1px solid #e5e7eb;
+          }
+          .building-info h2 {
+            margin: 0 0 10px 0;
+            color: #333;
+            font-size: 18px;
+          }
+          .building-info p {
+            margin: 0;
+            color: #666;
+          }
+          .form-section {
+            padding: 20px;
+          }
+          .field {
+            margin-bottom: 15px;
+          }
+          .field label {
+            display: block;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+          }
+          .footer {
+            padding: 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #e5e7eb;
+            text-align: center;
+            font-size: 14px;
+            color: #666;
+          }
+        `
+      }} />
+      
       <div className="max-w-md mx-auto">
         <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-          {/* Header */}
-          <div className="bg-red-600 text-white p-6 text-center">
-            <AlertTriangle className="h-12 w-12 mx-auto mb-3" />
-            <h1 className="text-xl font-bold">Asansör Arıza Bildirimi</h1>
-          </div>
-          
-          {/* Building Info */}
-          <div className="bg-gray-50 p-4 border-b">
-            <div className="flex items-center text-gray-700">
-              <Building2 className="h-5 w-5 mr-2" />
-              <div>
-                <p className="font-semibold">{building.name}</p>
-                <p className="text-sm text-gray-600">{building.address}</p>
-              </div>
-            </div>
-          </div>
+          {/* Header with company info */}
+          <div 
+            className="fault-report"
+            dangerouslySetInnerHTML={{ __html: generatePageContent() }}
+          />
           
           {/* Form */}
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
