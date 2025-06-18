@@ -171,9 +171,6 @@ const BuildingsPage: React.FC = () => {
     const building = state.buildings.find(b => b.id === buildingId);
     
     // If building is being marked as defective, show fault modal
-    if (building && !building.isDefective && !building.isMaintained) {
-      setShowFaultModal(buildingId);
-      return;
     }
     
     toggleMaintenance(buildingId, showReceipt);
