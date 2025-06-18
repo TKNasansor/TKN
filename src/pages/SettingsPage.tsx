@@ -423,21 +423,21 @@ const SettingsPage: React.FC = () => {
                   <div className="bg-gray-50 p-4 rounded-lg mb-4">
                     <h4 className="text-sm font-semibold text-gray-700 mb-2">Kullanılabilir Değişkenler:</h4>
                     <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
-                      <div>{{`{{LOGO}}`}} - Firma logosu</div>
-                      <div>{{`{{COMPANY_NAME}}`}} - Firma adı</div>
-                      <div>{{`{{COMPANY_ADDRESS}}`}} - Firma adresi</div>
-                      <div>{{`{{COMPANY_PHONE}}`}} - Firma telefonu</div>
-                      <div>{{`{{DATE}}`}} - Tarih</div>
-                      <div>{{`{{BUILDING_NAME}}`}} - Bina adı</div>
-                      <div>{{`{{BUILDING_ADDRESS}}`}} - Bina adresi</div>
-                      <div>{{`{{ELEVATOR_COUNT}}`}} - Asansör sayısı</div>
-                      <div>{{`{{MAINTENANCE_ACTION}}`}} - Bakım işlemi</div>
-                      <div>{{`{{TECHNICIAN}}`}} - Teknisyen</div>
-                      <div>{{`{{MAINTENANCE_FEE}}`}} - Bakım ücreti</div>
-                      <div>{{`{{PARTS_SECTION}}`}} - Parçalar bölümü</div>
-                      <div>{{`{{DEBT_SECTION}}`}} - Borç bölümü</div>
-                      <div>{{`{{TOTAL_AMOUNT}}`}} - Toplam tutar</div>
-                      <div>{{`{{TIMESTAMP}}`}} - Zaman damgası</div>
+                      <div>{'{{LOGO}}'} - Firma logosu</div>
+                      <div>{'{{COMPANY_NAME}}'} - Firma adı</div>
+                      <div>{'{{COMPANY_ADDRESS}}'} - Firma adresi</div>
+                      <div>{'{{COMPANY_PHONE}}'} - Firma telefonu</div>
+                      <div>{'{{DATE}}'} - Tarih</div>
+                      <div>{'{{BUILDING_NAME}}'} - Bina adı</div>
+                      <div>{'{{BUILDING_ADDRESS}}'} - Bina adresi</div>
+                      <div>{'{{ELEVATOR_COUNT}}'} - Asansör sayısı</div>
+                      <div>{'{{MAINTENANCE_ACTION}}'} - Bakım işlemi</div>
+                      <div>{'{{TECHNICIAN}}'} - Teknisyen</div>
+                      <div>{'{{MAINTENANCE_FEE}}'} - Bakım ücreti</div>
+                      <div>{'{{PARTS_SECTION}}'} - Parçalar bölümü</div>
+                      <div>{'{{DEBT_SECTION}}'} - Borç bölümü</div>
+                      <div>{'{{TOTAL_AMOUNT}}'} - Toplam tutar</div>
+                      <div>{'{{TIMESTAMP}}'} - Zaman damgası</div>
                     </div>
                   </div>
                   <textarea
