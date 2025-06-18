@@ -295,4 +295,6 @@ export interface AppState {
   hasUnsavedChanges: boolean;
   isAutoSaving: boolean;
   lastAutoSave?: string;
+  showReceiptModal: boolean;
+  receiptModalHtml: string | null;
 }

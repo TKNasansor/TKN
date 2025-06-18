@@ -2,11 +2,12 @@ import React from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import ReceiptModal from './ReceiptModal';
 import { useApp } from '../context/AppContext';
 import UserSelection from './UserSelection';
 
 const Layout: React.FC = () => {
-  const { state, toggleSidebar } = useApp();
+  const { state, toggleSidebar, closeReceiptModal } = useApp();
   
   if (!state.currentUser) {
     return <UserSelection />;
@@ -37,6 +38,13 @@ const Layout: React.FC = () => {
           <Outlet />
         </main>
       </div>
+
+      {/* Receipt Modal */}
+      <ReceiptModal
+        isOpen={state.showReceiptModal}
+        htmlContent={state.receiptModalHtml}
+        onClose={closeReceiptModal}
+      />
     </div>
   );
 };
