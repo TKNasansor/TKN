@@ -104,6 +104,8 @@ export interface AppSettings {
     latitude?: number;
     longitude?: number;
   };
+  ceEmblemUrl?: string;
+  tseEmblemUrl?: string;
   receiptTemplate: string;
   installationProposalTemplate: string;
   maintenanceProposalTemplate: string;

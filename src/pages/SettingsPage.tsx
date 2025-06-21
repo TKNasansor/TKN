@@ -480,6 +480,8 @@ const SettingsPage: React.FC = () => {
                       <div>{'{{COMPANY_NAME}}'} - Firma adı</div>
                       <div>{'{{COMPANY_ADDRESS}}'} - Firma adresi</div>
                       <div>{'{{COMPANY_PHONE}}'} - Firma telefonu</div>
+                      <div>{'{{CE_EMBLEM}}'} - CE amblemi</div>
+                      <div>{'{{TSE_EMBLEM}}'} - TSE amblemi</div>
                       <div>{'{{DATE}}'} - Tarih</div>
                       <div>{'{{BUILDING_NAME}}'} - Bina adı</div>
                       <div>{'{{BUILDING_ADDRESS}}'} - Bina adresi</div>
@@ -492,13 +494,38 @@ const SettingsPage: React.FC = () => {
                       <div>{'{{TOTAL_AMOUNT}}'} - Toplam tutar</div>
                       <div>{'{{TIMESTAMP}}'} - Zaman damgası</div>
                     </div>
+                    <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded">
+                      <h5 className="text-xs font-semibold text-blue-800 mb-2">Amblem Kullanımı:</h5>
+                      <div className="text-xs text-blue-700 space-y-1">
+                        <p>• CE amblemi için: {'{{CE_EMBLEM}}'}</p>
+                        <p>• TSE amblemi için: {'{{TSE_EMBLEM}}'}</p>
+                        <p>• Bu değişkenler otomatik olarak img etiketlerine dönüştürülür</p>
+                        <p>• Amblem URL'lerini ayarlar bölümünden güncelleyebilirsiniz</p>
+                      </div>
+                    </div>
                   </div>
                   <textarea
                     rows={8}
                     value={templates.receiptTemplate}
                     onChange={(e) => setTemplates(prev => ({ ...prev, receiptTemplate: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                    placeholder="Bakım fişi HTML şablonu..."
+                    placeholder={`Bakım fişi HTML şablonu örneği:
+
+<div class="header">
+  {{LOGO}}
+  <h1>{{COMPANY_NAME}}</h1>
+  <div class="certifications">
+    {{CE_EMBLEM}}
+    {{TSE_EMBLEM}}
+  </div>
+</div>
+
+<div class="content">
+  <h2>BAKIM FİŞİ</h2>
+  <p>Bina: {{BUILDING_NAME}}</p>
+  <p>Tarih: {{DATE}}</p>
+  <p>Teknisyen: {{TECHNICIAN}}</p>
+</div>`}
                   />
                 </div>
                 
@@ -657,6 +684,94 @@ const SettingsPage: React.FC = () => {
             ) : (
               <p className="text-gray-500 text-center py-4">Henüz teklif şablonu bulunmamaktadır.</p>
             )}
+          </div>
+        </div>
+
+        {/* Emblem Settings */}
+        <div className="bg-white shadow rounded-lg overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center">
+              <FileText className="h-5 w-5 text-gray-500 mr-2" />
+              <h3 className="text-lg font-medium text-gray-900">Amblem Ayarları</h3>
+            </div>
+          </div>
+          
+          <div className="p-6 space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                CE Amblemi URL
+              </label>
+              <input
+                type="url"
+                value={state.settings?.ceEmblemUrl || ''}
+                onChange={(e) => updateSettings({ ceEmblemUrl: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="https://example.com/ce-emblem.png"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                CE amblemi için görsel URL'si girin
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                TSE Amblemi URL
+              </label>
+              <input
+                type="url"
+                value={state.settings?.tseEmblemUrl || ''}
+                onChange={(e) => updateSettings({ tseEmblemUrl: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="https://example.com/tse-emblem.png"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                TSE amblemi için görsel URL'si girin
+              </p>
+            </div>
+
+            {(state.settings?.ceEmblemUrl || state.settings?.tseEmblemUrl) && (
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h4 className="text-sm font-medium text-gray-700 mb-3">Amblem Önizlemesi:</h4>
+                <div className="flex space-x-4">
+                  {state.settings?.ceEmblemUrl && (
+                    <div className="text-center">
+                      <img 
+                        src={state.settings.ceEmblemUrl} 
+                        alt="CE Amblemi" 
+                        className="h-12 w-12 object-contain mx-auto mb-1"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                      <p className="text-xs text-gray-500">CE Amblemi</p>
+                    </div>
+                  )}
+                  {state.settings?.tseEmblemUrl && (
+                    <div className="text-center">
+                      <img 
+                        src={state.settings.tseEmblemUrl} 
+                        alt="TSE Amblemi" 
+                        className="h-12 w-12 object-contain mx-auto mb-1"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                      <p className="text-xs text-gray-500">TSE Amblemi</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h4 className="text-sm font-medium text-blue-800 mb-2">Nasıl Kullanılır:</h4>
+              <div className="text-sm text-blue-700 space-y-1">
+                <p>1. Amblem görsellerini bir sunucuya yükleyin (örn: Google Drive, Dropbox)</p>
+                <p>2. Görsellerin doğrudan erişim URL'lerini yukarıdaki alanlara girin</p>
+                <p>3. Bakım fişi şablonunda {`{{CE_EMBLEM}}`} ve {`{{TSE_EMBLEM}}`} değişkenlerini kullanın</p>
+                <p>4. Bu değişkenler otomatik olarak img etiketlerine dönüştürülecektir</p>
+              </div>
+            </div>
           </div>
         </div>
 
