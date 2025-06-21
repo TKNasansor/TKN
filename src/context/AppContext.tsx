@@ -1,329 +1,8 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, ReactNode } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { AppState, Building, Part, PartInstallation, ManualPartInstallation, Update, Income, User, AppSettings, FaultReport, MaintenanceReceipt, MaintenanceHistory, Printer, MaintenanceRecord, SMSTemplate, Proposal, ProposalItem, Payment, DebtRecord, ProposalTemplate, ProposalField, AutoSaveData } from '../types';
+import { AppState, Building, Part, PartInstallation, ManualPartInstallation, Update, Income, User, DebtRecord, FaultReport, MaintenanceHistory, MaintenanceRecord, Printer, SMSTemplate, Proposal, Payment, ProposalTemplate, QRCodeData, AutoSaveData, ArchivedReceipt } from '../types';
 
-const initialSettings: AppSettings = {
-  appTitle: 'Asansör Bakım Takip',
-  logo: null,
-  companyName: 'Asansör Bakım Servisi',
-  companyPhone: '0555 123 45 67',
-  companyAddress: {
-    mahalle: 'Merkez Mahalle',
-    sokak: 'Ana Cadde',
-    il: 'İstanbul',
-    ilce: 'Kadıköy',
-    binaNo: '123'
-  },
-  autoSaveInterval: 60,
-  receiptTemplate: `
-    <div class="receipt">
-      <div class="header">
-        <div class="company-info">
-          <div class="logo-section">
-            {{LOGO}}
-          </div>
-          <div class="company-details">
-            <div class="company-name">{{COMPANY_NAME}}</div>
-            <div class="certifications">{{CE_EMBLEM}} | {{TSE_EMBLEM}}</div>
-          </div>
-        </div>
-        <div class="address-info">
-          <div class="address-label">Firma Adresi:</div>
-          <div class="address-text">{{COMPANY_ADDRESS}}</div>
-          <div class="phone-text">{{COMPANY_PHONE}}</div>
-          <div class="date-info">
-            <strong>Tarih:</strong> {{DATE}}
-          </div>
-        </div>
-      </div>
-      
-      <div class="section-title">YAPILAN İŞLEMLER</div>
-      
-      <div class="maintenance-info">
-        <div class="info-row">
-          <span class="label">Bina Adı:</span>
-          <span class="value">{{BUILDING_NAME}}</span>
-        </div>
-        <div class="info-row">
-          <span class="label">Adres:</span>
-          <span class="value">{{BUILDING_ADDRESS}}</span>
-        </div>
-        <div class="info-row">
-          <span class="label">Asansör Sayısı:</span>
-          <span class="value">{{ELEVATOR_COUNT}} adet</span>
-        </div>
-        <div class="info-row">
-          <span class="label">İşlem:</span>
-          <span class="value">{{MAINTENANCE_ACTION}}</span>
-        </div>
-        <div class="info-row">
-          <span class="label">Teknisyen:</span>
-          <span class="value">{{TECHNICIAN}}</span>
-        </div>
-        <div class="info-row">
-          <span class="label">Bakım Ücreti:</span>
-          <span class="value">{{MAINTENANCE_FEE}}</span>
-        </div>
-      </div>
-      
-      {{PARTS_SECTION}}
-      {{DEBT_SECTION}}
-      
-      <div class="total-section">
-        TOPLAM TUTAR: {{TOTAL_AMOUNT}}
-      </div>
-      
-      <div class="warnings">
-        <div class="warning-title">ÖNEMLI UYARILAR</div>
-        <div class="warning-text">
-          <strong>NOT:</strong> Bu bakımdan sonra meydana gelebilecek kapı camı kırılması, tavan aydınlatmasının kırılması durumlarında durumu hemen firmamıza bildiriniz, kırık kapı camı ile asansörü çalıştırmayınız. Aksi takdirde olabilecek durumlardan firmamız sorumlu olmayacaktır.
-        </div>
-        <div class="warning-text">
-          <strong>DİKKAT:</strong> Asansör bakımı esnasında değiştirilmesi önerilen parçaların apartman yönetimi tarafından parça değişimine onay verilmemesi durumunda doğacak aksaklık ve kazalardan firmamız sorumlu değildir.
-        </div>
-      </div>
-      
-      <div class="footer">
-        <div class="thank-you">Teşekkür ederiz</div>
-      </div>
-    </div>
-  `,
-  installationProposalTemplate: `
-    <div class="proposal">
-      <div class="header">
-        <div class="company-name">{{COMPANY_NAME}}</div>
-        <div class="proposal-title">MONTAJ TEKLİFİ</div>
-      </div>
-      
-      <div class="content">
-        <h2>{{PROPOSAL_TITLE}}</h2>
-        
-        <div class="building-info">
-          <strong>Bina:</strong> {{BUILDING_NAME}}<br>
-          <strong>Tarih:</strong> {{DATE}}<br>
-          <strong>Hazırlayan:</strong> {{CREATED_BY}}
-        </div>
-        
-        <p>{{DESCRIPTION}}</p>
-        
-        {{CUSTOM_FIELDS}}
-        
-        <table class="items-table">
-          <thead>
-            <tr>
-              <th>Açıklama</th>
-              <th>Miktar</th>
-              <th>Birim Fiyat</th>
-              <th>Toplam</th>
-            </tr>
-          </thead>
-          <tbody>
-            {{ITEMS}}
-          </tbody>
-        </table>
-        
-        <div class="total">
-          Toplam Tutar: {{TOTAL_AMOUNT}}
-        </div>
-      </div>
-      
-      <div class="footer">
-        <p>Bu teklif 30 gün geçerlidir.</p>
-        <p>{{COMPANY_PHONE}}</p>
-      </div>
-    </div>
-  `,
-  maintenanceProposalTemplate: `
-    <div class="proposal">
-      <div class="header">
-        <div class="company-name">{{COMPANY_NAME}}</div>
-        <div class="proposal-title">BAKIM SÖZLEŞMESİ</div>
-      </div>
-      
-      <div class="content">
-        <h2>{{PROPOSAL_TITLE}}</h2>
-        
-        <div class="building-info">
-          <strong>Bina:</strong> {{BUILDING_NAME}}<br>
-          <strong>Tarih:</strong> {{DATE}}<br>
-          <strong>Hazırlayan:</strong> {{CREATED_BY}}
-        </div>
-        
-        <p>{{DESCRIPTION}}</p>
-        
-        {{CUSTOM_FIELDS}}
-        
-        <table class="items-table">
-          <thead>
-            <tr>
-              <th>Hizmet</th>
-              <th>Süre</th>
-              <th>Aylık Ücret</th>
-              <th>Toplam</th>
-            </tr>
-          </thead>
-          <tbody>
-            {{ITEMS}}
-          </tbody>
-        </table>
-        
-        <div class="total">
-          Toplam Tutar: {{TOTAL_AMOUNT}}
-        </div>
-      </div>
-      
-      <div class="footer">
-        <p>Bu sözleşme 12 ay geçerlidir.</p>
-        <p>{{COMPANY_PHONE}}</p>
-      </div>
-    </div>
-  `,
-  revisionProposalTemplate: `
-    <div class="proposal">
-      <div class="header">
-        <div class="company-name">{{COMPANY_NAME}}</div>
-        <div class="proposal-title">REVİZYON TEKLİFİ</div>
-      </div>
-      
-      <div class="content">
-        <h2>{{PROPOSAL_TITLE}}</h2>
-        
-        <div class="building-info">
-          <strong>Bina:</strong> {{BUILDING_NAME}}<br>
-          <strong>Tarih:</strong> {{DATE}}<br>
-          <strong>Hazırlayan:</strong> {{CREATED_BY}}
-        </div>
-        
-        <p>{{DESCRIPTION}}</p>
-        
-        {{CUSTOM_FIELDS}}
-        
-        <table class="items-table">
-          <thead>
-            <tr>
-              <th>Revizyon İşlemi</th>
-              <th>Miktar</th>
-              <th>Birim Fiyat</th>
-              <th>Toplam</th>
-            </tr>
-          </thead>
-          <tbody>
-            {{ITEMS}}
-          </tbody>
-        </table>
-        
-        <div class="total">
-          Toplam Tutar: {{TOTAL_AMOUNT}}
-        </div>
-      </div>
-      
-      <div class="footer">
-        <p>Bu teklif 45 gün geçerlidir.</p>
-        <p>{{COMPANY_PHONE}}</p>
-      </div>
-    </div>
-  `,
-  faultReportTemplate: `
-    <div class="fault-report">
-      <div class="header">
-        <div class="logo-section">
-          {{LOGO}}
-        </div>
-        <div class="company-details">
-          <div class="company-name">{{COMPANY_NAME}}</div>
-          <div class="certifications">{{CE_EMBLEM}} | {{TSE_EMBLEM}}</div>
-        </div>
-        <div class="address-info">
-          <div class="address-text">{{COMPANY_ADDRESS}}</div>
-          <div class="phone-text">{{COMPANY_PHONE}}</div>
-        </div>
-      </div>
-      
-      <div class="report-title">
-        <h1>Asansör Arıza Bildirimi</h1>
-      </div>
-      
-      <div class="building-info">
-        <h2>{{BUILDING_NAME}}</h2>
-        <p>{{BUILDING_ADDRESS}}</p>
-      </div>
-      
-      <div class="form-section">
-        <div class="field">
-          <label>Ad Soyad:</label>
-          <span>{{REPORTER_NAME}}</span>
-        </div>
-        <div class="field">
-          <label>Telefon:</label>
-          <span>{{REPORTER_PHONE}}</span>
-        </div>
-        <div class="field">
-          <label>Daire No:</label>
-          <span>{{APARTMENT_NO}}</span>
-        </div>
-        <div class="field">
-          <label>Arıza Açıklaması:</label>
-          <p>{{DESCRIPTION}}</p>
-        </div>
-      </div>
-      
-      <div class="footer">
-        <p>Acil durumlar için 112'yi arayın.</p>
-        <p>{{COMPANY_PHONE}}</p>
-      </div>
-    </div>
-  `
-};
-
-const sampleParts = [
-  { name: 'Asansör Kapı Motoru', quantity: 5, price: 2500 },
-  { name: 'Fren Balata Takımı', quantity: 10, price: 450 },
-  { name: 'Kabin Lambası LED', quantity: 20, price: 85 },
-  { name: 'Emniyet Şalteri', quantity: 8, price: 320 },
-  { name: 'Kapı Sensörü', quantity: 12, price: 180 },
-  { name: 'Kontrol Kartı', quantity: 3, price: 1200 },
-  { name: 'Asansör Halatı (1m)', quantity: 50, price: 25 },
-  { name: 'Kat Butonu', quantity: 15, price: 65 }
-];
-
-const initialProposalTemplates: ProposalTemplate[] = [
-  {
-    id: 'installation-template-1',
-    type: 'installation',
-    name: 'Standart Montaj Teklifi',
-    content: '',
-    fields: [
-      { id: 'elevator_type', name: 'elevator_type', label: 'Asansör Tipi', type: 'text', required: true, placeholder: 'Yolcu asansörü' },
-      { id: 'capacity', name: 'capacity', label: 'Kapasite (kg)', type: 'number', required: true, placeholder: '630' },
-      { id: 'floors', name: 'floors', label: 'Kat Sayısı', type: 'number', required: true, placeholder: '5' },
-      { id: 'installation_time', name: 'installation_time', label: 'Montaj Süresi', type: 'text', required: false, placeholder: '15 gün' }
-    ]
-  },
-  {
-    id: 'maintenance-template-1',
-    type: 'maintenance',
-    name: 'Standart Bakım Sözleşmesi',
-    content: '',
-    fields: [
-      { id: 'contract_duration', name: 'contract_duration', label: 'Sözleşme Süresi', type: 'text', required: true, placeholder: '12 ay' },
-      { id: 'visit_frequency', name: 'visit_frequency', label: 'Ziyaret Sıklığı', type: 'text', required: true, placeholder: 'Ayda 1 kez' },
-      { id: 'emergency_service', name: 'emergency_service', label: 'Acil Servis', type: 'text', required: false, placeholder: '7/24' }
-    ]
-  },
-  {
-    id: 'revision-template-1',
-    type: 'revision',
-    name: 'Standart Revizyon Teklifi',
-    content: '',
-    fields: [
-      { id: 'current_age', name: 'current_age', label: 'Mevcut Asansör Yaşı', type: 'number', required: true, placeholder: '15' },
-      { id: 'revision_scope', name: 'revision_scope', label: 'Revizyon Kapsamı', type: 'textarea', required: true, placeholder: 'Makine dairesi yenileme, kabin modernizasyonu' },
-      { id: 'completion_time', name: 'completion_time', label: 'Tamamlanma Süresi', type: 'text', required: false, placeholder: '30 gün' }
-    ]
-  }
-];
-
-const initialAppState: AppState = {
+const initialState: AppState = {
   buildings: [],
   parts: [],
   partInstallations: [],
@@ -334,7 +13,233 @@ const initialAppState: AppState = {
   users: [],
   notifications: [],
   sidebarOpen: false,
-  settings: initialSettings,
+  settings: {
+    appTitle: 'Asansör Bakım Takip',
+    logo: null,
+    companyName: 'Asansör Bakım Servisi',
+    companyPhone: '0555 123 45 67',
+    companyAddress: {
+      mahalle: '',
+      sokak: '',
+      il: '',
+      ilce: '',
+      binaNo: ''
+    },
+    ceEmblemUrl: '/ce.png',
+    tseEmblemUrl: '/ts.jpg',
+    receiptTemplate: `
+      <div class="receipt">
+        <div class="header">
+          <div class="logo-section">
+            {{LOGO}}
+          </div>
+          <div class="company-details">
+            <div class="company-name">{{COMPANY_NAME}}</div>
+            <div class="certifications">
+              {{CE_EMBLEM}}
+              {{TSE_EMBLEM}}
+            </div>
+          </div>
+          <div class="address-info">
+            <div class="address-text">{{COMPANY_ADDRESS}}</div>
+            <div class="phone-text">Tel: {{COMPANY_PHONE}}</div>
+          </div>
+        </div>
+        
+        <div class="receipt-title">
+          <h1>BAKIM FİŞİ</h1>
+        </div>
+        
+        <div class="building-info">
+          <h2>{{BUILDING_NAME}}</h2>
+          <p>{{BUILDING_ADDRESS}}</p>
+        </div>
+        
+        <div class="maintenance-details">
+          <div class="detail-row">
+            <span class="label">Tarih:</span>
+            <span class="value">{{DATE}}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Asansör Sayısı:</span>
+            <span class="value">{{ELEVATOR_COUNT}}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Yapılan İşlem:</span>
+            <span class="value">{{MAINTENANCE_ACTION}}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Teknisyen:</span>
+            <span class="value">{{TECHNICIAN}}</span>
+          </div>
+        </div>
+        
+        {{PARTS_SECTION}}
+        {{DEBT_SECTION}}
+        
+        <div class="total-section">
+          <div class="total-row">
+            <span class="total-label">Toplam Tutar:</span>
+            <span class="total-value">{{TOTAL_AMOUNT}} ₺</span>
+          </div>
+        </div>
+        
+        <div class="footer">
+          <p>Bu fiş {{TIMESTAMP}} tarihinde oluşturulmuştur.</p>
+          <p>Teşekkür ederiz.</p>
+        </div>
+      </div>
+      
+      <style>
+        .receipt {
+          max-width: 800px;
+          margin: 0 auto;
+          background: white;
+          font-family: Arial, sans-serif;
+          line-height: 1.4;
+        }
+        .header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          padding: 20px;
+          background: #f8f9fa;
+          border-bottom: 2px solid #333;
+        }
+        .logo-section {
+          flex: 1;
+        }
+        .logo {
+          max-height: 60px;
+          max-width: 150px;
+        }
+        .company-details {
+          flex: 2;
+          text-align: center;
+        }
+        .company-name {
+          font-size: 24px;
+          font-weight: bold;
+          color: #333;
+          margin: 10px 0;
+        }
+        .certifications {
+          display: flex;
+          justify-content: center;
+          gap: 15px;
+          margin-top: 10px;
+        }
+        .certifications img {
+          max-height: 40px;
+          object-fit: contain;
+        }
+        .address-info {
+          flex: 1;
+          text-align: right;
+          font-size: 12px;
+          color: #666;
+        }
+        .address-text {
+          margin-bottom: 5px;
+          line-height: 1.4;
+        }
+        .phone-text {
+          font-weight: bold;
+        }
+        .receipt-title {
+          text-align: center;
+          padding: 20px;
+          background: #dc2626;
+          color: white;
+        }
+        .receipt-title h1 {
+          margin: 0;
+          font-size: 20px;
+        }
+        .building-info {
+          padding: 20px;
+          background: #f3f4f6;
+          border-bottom: 1px solid #e5e7eb;
+        }
+        .building-info h2 {
+          margin: 0 0 10px 0;
+          color: #333;
+          font-size: 18px;
+        }
+        .building-info p {
+          margin: 0;
+          color: #666;
+        }
+        .maintenance-details {
+          padding: 20px;
+        }
+        .detail-row {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 10px;
+          padding: 5px 0;
+          border-bottom: 1px dotted #ccc;
+        }
+        .label {
+          font-weight: bold;
+          color: #333;
+        }
+        .value {
+          color: #666;
+        }
+        .parts-section, .debt-section {
+          margin: 20px;
+          padding: 15px;
+          background: #f9f9f9;
+          border-radius: 5px;
+        }
+        .section-title {
+          font-weight: bold;
+          color: #333;
+          margin-bottom: 10px;
+          font-size: 16px;
+        }
+        .total-section {
+          padding: 20px;
+          background: #f3f4f6;
+          border-top: 2px solid #333;
+        }
+        .total-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .total-label {
+          font-size: 18px;
+          font-weight: bold;
+          color: #333;
+        }
+        .total-value {
+          font-size: 20px;
+          font-weight: bold;
+          color: #dc2626;
+        }
+        .footer {
+          padding: 20px;
+          text-align: center;
+          font-size: 12px;
+          color: #666;
+          border-top: 1px solid #e5e7eb;
+        }
+        @media print {
+          .receipt {
+            box-shadow: none;
+          }
+        }
+      </style>
+    `,
+    installationProposalTemplate: '',
+    maintenanceProposalTemplate: '',
+    revisionProposalTemplate: '',
+    faultReportTemplate: '',
+    autoSaveInterval: 60
+  },
+  lastMaintenanceReset: undefined,
   faultReports: [],
   maintenanceReceipts: [],
   maintenanceHistory: [],
@@ -345,41 +250,1053 @@ const initialAppState: AppState = {
   proposals: [],
   payments: [],
   debtRecords: [],
-  proposalTemplates: initialProposalTemplates,
+  proposalTemplates: [],
   qrCodes: [],
   systemNotifications: [],
   autoSaveData: [],
   hasUnsavedChanges: false,
   isAutoSaving: false,
+  lastAutoSave: undefined,
   showReceiptModal: false,
   receiptModalHtml: null,
+  archivedReceipts: [],
+  showPrinterSelectionModal: false,
+  printerSelectionContent: null,
 };
 
-interface AppContextProps {
+type Action =
+  | { type: 'ADD_BUILDING'; payload: Omit<Building, 'id'> }
+  | { type: 'UPDATE_BUILDING'; payload: Building }
+  | { type: 'DELETE_BUILDING'; payload: string }
+  | { type: 'ADD_PART'; payload: Omit<Part, 'id'> }
+  | { type: 'UPDATE_PART'; payload: Part }
+  | { type: 'DELETE_PART'; payload: string }
+  | { type: 'INSTALL_PART'; payload: Omit<PartInstallation, 'id' | 'installedBy'> }
+  | { type: 'INSTALL_MANUAL_PART'; payload: Omit<ManualPartInstallation, 'id' | 'installedBy'> }
+  | { type: 'MARK_PART_AS_PAID'; payload: { installationId: string; isManual: boolean } }
+  | { type: 'ADD_UPDATE'; payload: Omit<Update, 'id' | 'timestamp'> }
+  | { type: 'ADD_INCOME'; payload: Omit<Income, 'id'> }
+  | { type: 'SET_USER'; payload: string }
+  | { type: 'DELETE_USER'; payload: string }
+  | { type: 'ADD_NOTIFICATION'; payload: string }
+  | { type: 'CLEAR_NOTIFICATIONS' }
+  | { type: 'TOGGLE_SIDEBAR' }
+  | { type: 'TOGGLE_MAINTENANCE'; payload: { buildingId: string; showReceipt: boolean } }
+  | { type: 'REPORT_FAULT'; payload: { buildingId: string; faultData: { description: string; severity: 'low' | 'medium' | 'high'; reportedBy: string } } }
+  | { type: 'UPDATE_SETTINGS'; payload: Partial<AppState['settings']> }
+  | { type: 'RESET_MAINTENANCE_STATUS' }
+  | { type: 'ADD_FAULT_REPORT'; payload: Omit<FaultReport, 'id' | 'timestamp' | 'status'> }
+  | { type: 'RESOLVE_FAULT_REPORT'; payload: string }
+  | { type: 'ADD_MAINTENANCE_HISTORY'; payload: Omit<MaintenanceHistory, 'id'> }
+  | { type: 'ADD_MAINTENANCE_RECORD'; payload: Omit<MaintenanceRecord, 'id'> }
+  | { type: 'ADD_PRINTER'; payload: Omit<Printer, 'id'> }
+  | { type: 'UPDATE_PRINTER'; payload: Printer }
+  | { type: 'DELETE_PRINTER'; payload: string }
+  | { type: 'ADD_SMS_TEMPLATE'; payload: Omit<SMSTemplate, 'id'> }
+  | { type: 'UPDATE_SMS_TEMPLATE'; payload: SMSTemplate }
+  | { type: 'DELETE_SMS_TEMPLATE'; payload: string }
+  | { type: 'SEND_BULK_SMS'; payload: { templateId: string; buildingIds: string[] } }
+  | { type: 'SEND_WHATSAPP'; payload: { templateId: string; buildingIds: string[] } }
+  | { type: 'ADD_PROPOSAL'; payload: Omit<Proposal, 'id' | 'createdDate' | 'createdBy'> }
+  | { type: 'UPDATE_PROPOSAL'; payload: Proposal }
+  | { type: 'DELETE_PROPOSAL'; payload: string }
+  | { type: 'ADD_PAYMENT'; payload: Omit<Payment, 'id'> }
+  | { type: 'ADD_PROPOSAL_TEMPLATE'; payload: Omit<ProposalTemplate, 'id'> }
+  | { type: 'UPDATE_PROPOSAL_TEMPLATE'; payload: ProposalTemplate }
+  | { type: 'DELETE_PROPOSAL_TEMPLATE'; payload: string }
+  | { type: 'ADD_QR_CODE_DATA'; payload: Omit<QRCodeData, 'id'> }
+  | { type: 'UPDATE_AUTO_SAVE_DATA'; payload: AutoSaveData }
+  | { type: 'SHOW_RECEIPT_MODAL'; payload: string }
+  | { type: 'CLOSE_RECEIPT_MODAL' }
+  | { type: 'ARCHIVE_RECEIPT'; payload: Omit<ArchivedReceipt, 'id'> }
+  | { type: 'SHOW_PRINTER_SELECTION'; payload: string }
+  | { type: 'CLOSE_PRINTER_SELECTION' }
+  | { type: 'INCREASE_PRICES'; payload: number };
+
+function appReducer(state: AppState, action: Action): AppState {
+  switch (action.type) {
+    case 'ADD_BUILDING':
+      const newBuilding: Building = {
+        ...action.payload,
+        id: uuidv4(),
+      };
+      return {
+        ...state,
+        buildings: [...state.buildings, newBuilding],
+        updates: [
+          {
+            id: uuidv4(),
+            action: 'Bina Eklendi',
+            user: state.currentUser?.name || 'Bilinmeyen',
+            timestamp: new Date().toISOString(),
+            details: `${newBuilding.name} binası sisteme eklendi.`,
+          },
+          ...state.updates,
+        ],
+      };
+
+    case 'UPDATE_BUILDING':
+      return {
+        ...state,
+        buildings: state.buildings.map(building =>
+          building.id === action.payload.id ? action.payload : building
+        ),
+        updates: [
+          {
+            id: uuidv4(),
+            action: 'Bina Güncellendi',
+            user: state.currentUser?.name || 'Bilinmeyen',
+            timestamp: new Date().toISOString(),
+            details: `${action.payload.name} binası güncellendi.`,
+          },
+          ...state.updates,
+        ],
+      };
+
+    case 'DELETE_BUILDING':
+      const buildingToDelete = state.buildings.find(b => b.id === action.payload);
+      return {
+        ...state,
+        buildings: state.buildings.filter(building => building.id !== action.payload),
+        updates: [
+          {
+            id: uuidv4(),
+            action: 'Bina Silindi',
+            user: state.currentUser?.name || 'Bilinmeyen',
+            timestamp: new Date().toISOString(),
+            details: `${buildingToDelete?.name || 'Bilinmeyen'} binası silindi.`,
+          },
+          ...state.updates,
+        ],
+      };
+
+    case 'ADD_PART':
+      const newPart: Part = {
+        ...action.payload,
+        id: uuidv4(),
+      };
+      return {
+        ...state,
+        parts: [...state.parts, newPart],
+        updates: [
+          {
+            id: uuidv4(),
+            action: 'Parça Eklendi',
+            user: state.currentUser?.name || 'Bilinmeyen',
+            timestamp: new Date().toISOString(),
+            details: `${newPart.name} parçası stoka eklendi.`,
+          },
+          ...state.updates,
+        ],
+      };
+
+    case 'UPDATE_PART':
+      return {
+        ...state,
+        parts: state.parts.map(part =>
+          part.id === action.payload.id ? action.payload : part
+        ),
+      };
+
+    case 'DELETE_PART':
+      const partToDelete = state.parts.find(p => p.id === action.payload);
+      return {
+        ...state,
+        parts: state.parts.filter(part => part.id !== action.payload),
+        updates: [
+          {
+            id: uuidv4(),
+            action: 'Parça Silindi',
+            user: state.currentUser?.name || 'Bilinmeyen',
+            timestamp: new Date().toISOString(),
+            details: `${partToDelete?.name || 'Bilinmeyen'} parçası stoktan silindi.`,
+          },
+          ...state.updates,
+        ],
+      };
+
+    case 'INSTALL_PART':
+      const installation: PartInstallation = {
+        ...action.payload,
+        id: uuidv4(),
+        installedBy: state.currentUser?.name || 'Bilinmeyen',
+        isPaid: false,
+      };
+
+      const part = state.parts.find(p => p.id === action.payload.partId);
+      const building = state.buildings.find(b => b.id === action.payload.buildingId);
+      
+      if (!part || part.quantity < action.payload.quantity) {
+        return state;
+      }
+
+      const totalPartCost = part.price * action.payload.quantity;
+
+      // Update part quantity
+      const updatedParts = state.parts.map(p =>
+        p.id === action.payload.partId
+          ? { ...p, quantity: p.quantity - action.payload.quantity }
+          : p
+      );
+
+      // Update building debt
+      const updatedBuildings = state.buildings.map(b =>
+        b.id === action.payload.buildingId
+          ? { ...b, debt: b.debt + totalPartCost }
+          : b
+      );
+
+      // Add debt record
+      const debtRecord: DebtRecord = {
+        id: uuidv4(),
+        buildingId: action.payload.buildingId,
+        date: action.payload.installDate,
+        type: 'part',
+        description: `${action.payload.quantity} adet ${part.name} takıldı`,
+        amount: totalPartCost,
+        previousDebt: building?.debt || 0,
+        newDebt: (building?.debt || 0) + totalPartCost,
+        performedBy: state.currentUser?.name || 'Bilinmeyen',
+      };
+
+      return {
+        ...state,
+        partInstallations: [...state.partInstallations, installation],
+        parts: updatedParts,
+        buildings: updatedBuildings,
+        debtRecords: [...state.debtRecords, debtRecord],
+        updates: [
+          {
+            id: uuidv4(),
+            action: 'Parça Takıldı',
+            user: state.currentUser?.name || 'Bilinmeyen',
+            timestamp: new Date().toISOString(),
+            details: `${building?.name || 'Bilinmeyen'} binasına ${action.payload.quantity} adet ${part.name} takıldı.`,
+          },
+          ...state.updates,
+        ],
+      };
+
+    case 'INSTALL_MANUAL_PART':
+      const manualInstallation: ManualPartInstallation = {
+        ...action.payload,
+        id: uuidv4(),
+        installedBy: state.currentUser?.name || 'Bilinmeyen',
+        isPaid: false,
+      };
+
+      const manualBuilding = state.buildings.find(b => b.id === action.payload.buildingId);
+
+      // Update building debt
+      const updatedBuildingsManual = state.buildings.map(b =>
+        b.id === action.payload.buildingId
+          ? { ...b, debt: b.debt + action.payload.totalPrice }
+          : b
+      );
+
+      // Add debt record
+      const manualDebtRecord: DebtRecord = {
+        id: uuidv4(),
+        buildingId: action.payload.buildingId,
+        date: action.payload.installDate,
+        type: 'part',
+        description: `${action.payload.quantity} adet ${action.payload.partName} takıldı (Manuel)`,
+        amount: action.payload.totalPrice,
+        previousDebt: manualBuilding?.debt || 0,
+        newDebt: (manualBuilding?.debt || 0) + action.payload.totalPrice,
+        performedBy: state.currentUser?.name || 'Bilinmeyen',
+      };
+
+      return {
+        ...state,
+        manualPartInstallations: [...state.manualPartInstallations, manualInstallation],
+        buildings: updatedBuildingsManual,
+        debtRecords: [...state.debtRecords, manualDebtRecord],
+        updates: [
+          {
+            id: uuidv4(),
+            action: 'Manuel Parça Takıldı',
+            user: state.currentUser?.name || 'Bilinmeyen',
+            timestamp: new Date().toISOString(),
+            details: `${manualBuilding?.name || 'Bilinmeyen'} binasına ${action.payload.quantity} adet ${action.payload.partName} takıldı.`,
+          },
+          ...state.updates,
+        ],
+      };
+
+    case 'MARK_PART_AS_PAID':
+      const { installationId, isManual } = action.payload;
+      const paymentDate = new Date().toISOString();
+
+      if (isManual) {
+        return {
+          ...state,
+          manualPartInstallations: state.manualPartInstallations.map(installation =>
+            installation.id === installationId
+              ? { ...installation, isPaid: true, paymentDate }
+              : installation
+          ),
+        };
+      } else {
+        return {
+          ...state,
+          partInstallations: state.partInstallations.map(installation =>
+            installation.id === installationId
+              ? { ...installation, isPaid: true, paymentDate }
+              : installation
+          ),
+        };
+      }
+
+    case 'ADD_UPDATE':
+      const update: Update = {
+        ...action.payload,
+        id: uuidv4(),
+        timestamp: new Date().toISOString(),
+      };
+      return {
+        ...state,
+        updates: [update, ...state.updates],
+      };
+
+    case 'ADD_INCOME':
+      const income: Income = {
+        ...action.payload,
+        id: uuidv4(),
+      };
+      return {
+        ...state,
+        incomes: [...state.incomes, income],
+      };
+
+    case 'SET_USER':
+      const existingUser = state.users.find(u => u.name === action.payload);
+      let currentUser: User;
+      let updatedUsers = state.users;
+
+      if (existingUser) {
+        currentUser = existingUser;
+      } else {
+        currentUser = {
+          id: uuidv4(),
+          name: action.payload,
+        };
+        updatedUsers = [...state.users, currentUser];
+      }
+
+      return {
+        ...state,
+        currentUser,
+        users: updatedUsers,
+      };
+
+    case 'DELETE_USER':
+      return {
+        ...state,
+        users: state.users.filter(user => user.id !== action.payload),
+      };
+
+    case 'ADD_NOTIFICATION':
+      return {
+        ...state,
+        notifications: [action.payload, ...state.notifications],
+        unreadNotifications: state.unreadNotifications + 1,
+      };
+
+    case 'CLEAR_NOTIFICATIONS':
+      return {
+        ...state,
+        notifications: [],
+        unreadNotifications: 0,
+      };
+
+    case 'TOGGLE_SIDEBAR':
+      return {
+        ...state,
+        sidebarOpen: !state.sidebarOpen,
+      };
+
+    case 'TOGGLE_MAINTENANCE':
+      const { buildingId, showReceipt } = action.payload;
+      const targetBuilding = state.buildings.find(b => b.id === buildingId);
+      
+      if (!targetBuilding) return state;
+
+      const newMaintenanceStatus = !targetBuilding.isMaintained;
+      const currentDate = new Date().toISOString().split('T')[0];
+      const currentTime = new Date().toLocaleTimeString('tr-TR', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
+
+      let updatedBuildingsForMaintenance = state.buildings.map(b =>
+        b.id === buildingId
+          ? {
+              ...b,
+              isMaintained: newMaintenanceStatus,
+              lastMaintenanceDate: newMaintenanceStatus ? currentDate : b.lastMaintenanceDate,
+              lastMaintenanceTime: newMaintenanceStatus ? currentTime : b.lastMaintenanceTime,
+              isDefective: false, // Clear defective status when maintenance is done
+              defectiveNote: undefined,
+              faultSeverity: undefined,
+              faultTimestamp: undefined,
+              faultReportedBy: undefined,
+            }
+          : b
+      );
+
+      let newDebtRecords = [...state.debtRecords];
+      let newMaintenanceHistory = [...state.maintenanceHistory];
+      let newMaintenanceRecords = [...state.maintenanceRecords];
+
+      if (newMaintenanceStatus) {
+        const maintenanceFee = targetBuilding.maintenanceFee * targetBuilding.elevatorCount;
+        
+        // Update building debt
+        updatedBuildingsForMaintenance = updatedBuildingsForMaintenance.map(b =>
+          b.id === buildingId
+            ? { ...b, debt: b.debt + maintenanceFee }
+            : b
+        );
+
+        // Add debt record
+        const maintenanceDebtRecord: DebtRecord = {
+          id: uuidv4(),
+          buildingId,
+          date: currentDate,
+          type: 'maintenance',
+          description: `Bakım ücreti (${targetBuilding.elevatorCount} asansör)`,
+          amount: maintenanceFee,
+          previousDebt: targetBuilding.debt,
+          newDebt: targetBuilding.debt + maintenanceFee,
+          performedBy: state.currentUser?.name || 'Bilinmeyen',
+        };
+
+        newDebtRecords = [...newDebtRecords, maintenanceDebtRecord];
+
+        // Add maintenance history
+        const maintenanceHistoryRecord: MaintenanceHistory = {
+          id: uuidv4(),
+          buildingId,
+          maintenanceDate: currentDate,
+          maintenanceTime: currentTime,
+          performedBy: state.currentUser?.name || 'Bilinmeyen',
+          maintenanceFee,
+        };
+
+        newMaintenanceHistory = [...newMaintenanceHistory, maintenanceHistoryRecord];
+
+        // Add maintenance record
+        const maintenanceRecord: MaintenanceRecord = {
+          id: uuidv4(),
+          buildingId,
+          performedBy: state.currentUser?.name || 'Bilinmeyen',
+          maintenanceDate: currentDate,
+          maintenanceTime: currentTime,
+          elevatorCount: targetBuilding.elevatorCount,
+          totalFee: maintenanceFee,
+          status: 'completed',
+          priority: 'medium',
+          searchableText: `${targetBuilding.name} ${state.currentUser?.name || 'Bilinmeyen'} bakım`,
+        };
+
+        newMaintenanceRecords = [...newMaintenanceRecords, maintenanceRecord];
+      }
+
+      const newState = {
+        ...state,
+        buildings: updatedBuildingsForMaintenance,
+        debtRecords: newDebtRecords,
+        maintenanceHistory: newMaintenanceHistory,
+        maintenanceRecords: newMaintenanceRecords,
+        updates: [
+          {
+            id: uuidv4(),
+            action: newMaintenanceStatus ? 'Bakım Tamamlandı' : 'Bakım İptali',
+            user: state.currentUser?.name || 'Bilinmeyen',
+            timestamp: new Date().toISOString(),
+            details: `${targetBuilding.name} binasının bakımı ${newMaintenanceStatus ? 'tamamlandı' : 'iptal edildi'}.`,
+          },
+          ...state.updates,
+        ],
+      };
+
+      // Show receipt modal if requested and maintenance was completed
+      if (showReceipt && newMaintenanceStatus) {
+        const receiptHtml = generateMaintenanceReceipt(targetBuilding, newState.settings, state.currentUser?.name || 'Bilinmeyen');
+        return {
+          ...newState,
+          showReceiptModal: true,
+          receiptModalHtml: receiptHtml,
+        };
+      }
+
+      return newState;
+
+    case 'REPORT_FAULT':
+      const { buildingId: faultBuildingId, faultData } = action.payload;
+      const faultBuilding = state.buildings.find(b => b.id === faultBuildingId);
+      
+      if (!faultBuilding) return state;
+
+      const updatedBuildingsForFault = state.buildings.map(b =>
+        b.id === faultBuildingId
+          ? {
+              ...b,
+              isDefective: true,
+              defectiveNote: faultData.description,
+              faultSeverity: faultData.severity,
+              faultTimestamp: new Date().toISOString(),
+              faultReportedBy: faultData.reportedBy,
+            }
+          : b
+      );
+
+      return {
+        ...state,
+        buildings: updatedBuildingsForFault,
+        updates: [
+          {
+            id: uuidv4(),
+            action: 'Arıza Bildirildi',
+            user: state.currentUser?.name || 'Bilinmeyen',
+            timestamp: new Date().toISOString(),
+            details: `${faultBuilding.name} binası arızalı olarak işaretlendi. Bildiren: ${faultData.reportedBy}`,
+          },
+          ...state.updates,
+        ],
+        notifications: [
+          `${faultBuilding.name} binasında arıza bildirildi (${faultData.severity === 'high' ? 'Yüksek' : faultData.severity === 'medium' ? 'Orta' : 'Düşük'} öncelik)`,
+          ...state.notifications,
+        ],
+        unreadNotifications: state.unreadNotifications + 1,
+      };
+
+    case 'UPDATE_SETTINGS':
+      return {
+        ...state,
+        settings: {
+          ...state.settings,
+          ...action.payload,
+        },
+      };
+
+    case 'RESET_MAINTENANCE_STATUS':
+      const resetBuildings = state.buildings.map(building => ({
+        ...building,
+        isMaintained: false,
+      }));
+
+      return {
+        ...state,
+        buildings: resetBuildings,
+        lastMaintenanceReset: new Date().toISOString(),
+        updates: [
+          {
+            id: uuidv4(),
+            action: 'Bakım Durumları Sıfırlandı',
+            user: state.currentUser?.name || 'Bilinmeyen',
+            timestamp: new Date().toISOString(),
+            details: 'Tüm binaların bakım durumları sıfırlandı.',
+          },
+          ...state.updates,
+        ],
+      };
+
+    case 'ADD_FAULT_REPORT':
+      const faultReport: FaultReport = {
+        ...action.payload,
+        id: uuidv4(),
+        timestamp: new Date().toISOString(),
+        status: 'pending',
+      };
+
+      return {
+        ...state,
+        faultReports: [...state.faultReports, faultReport],
+        notifications: [
+          `Yeni arıza bildirimi: ${action.payload.reporterName} ${action.payload.reporterSurname}`,
+          ...state.notifications,
+        ],
+        unreadNotifications: state.unreadNotifications + 1,
+      };
+
+    case 'RESOLVE_FAULT_REPORT':
+      return {
+        ...state,
+        faultReports: state.faultReports.map(report =>
+          report.id === action.payload
+            ? { ...report, status: 'resolved' }
+            : report
+        ),
+      };
+
+    case 'ADD_MAINTENANCE_HISTORY':
+      const maintenanceHistory: MaintenanceHistory = {
+        ...action.payload,
+        id: uuidv4(),
+      };
+
+      return {
+        ...state,
+        maintenanceHistory: [...state.maintenanceHistory, maintenanceHistory],
+      };
+
+    case 'ADD_MAINTENANCE_RECORD':
+      const maintenanceRecord: MaintenanceRecord = {
+        ...action.payload,
+        id: uuidv4(),
+      };
+
+      return {
+        ...state,
+        maintenanceRecords: [...state.maintenanceRecords, maintenanceRecord],
+      };
+
+    case 'ADD_PRINTER':
+      const newPrinter: Printer = {
+        ...action.payload,
+        id: uuidv4(),
+      };
+
+      // If this is set as default, remove default from others
+      let updatedPrinters = state.printers;
+      if (newPrinter.isDefault) {
+        updatedPrinters = state.printers.map(p => ({ ...p, isDefault: false }));
+      }
+
+      return {
+        ...state,
+        printers: [...updatedPrinters, newPrinter],
+      };
+
+    case 'UPDATE_PRINTER':
+      let printersForUpdate = state.printers;
+      
+      // If this printer is being set as default, remove default from others
+      if (action.payload.isDefault) {
+        printersForUpdate = state.printers.map(p => 
+          p.id === action.payload.id ? p : { ...p, isDefault: false }
+        );
+      }
+
+      return {
+        ...state,
+        printers: printersForUpdate.map(printer =>
+          printer.id === action.payload.id ? action.payload : printer
+        ),
+      };
+
+    case 'DELETE_PRINTER':
+      return {
+        ...state,
+        printers: state.printers.filter(printer => printer.id !== action.payload),
+      };
+
+    case 'ADD_SMS_TEMPLATE':
+      const newSMSTemplate: SMSTemplate = {
+        ...action.payload,
+        id: uuidv4(),
+      };
+
+      return {
+        ...state,
+        smsTemplates: [...state.smsTemplates, newSMSTemplate],
+      };
+
+    case 'UPDATE_SMS_TEMPLATE':
+      return {
+        ...state,
+        smsTemplates: state.smsTemplates.map(template =>
+          template.id === action.payload.id ? action.payload : template
+        ),
+      };
+
+    case 'DELETE_SMS_TEMPLATE':
+      return {
+        ...state,
+        smsTemplates: state.smsTemplates.filter(template => template.id !== action.payload),
+      };
+
+    case 'SEND_BULK_SMS':
+      // In a real implementation, this would trigger SMS sending
+      console.log('Sending SMS to buildings:', action.payload.buildingIds);
+      return state;
+
+    case 'SEND_WHATSAPP':
+      const { templateId, buildingIds } = action.payload;
+      const template = state.smsTemplates.find(t => t.id === templateId);
+      
+      if (template) {
+        buildingIds.forEach(buildingId => {
+          const building = state.buildings.find(b => b.id === buildingId);
+          if (building && building.contactInfo) {
+            const message = encodeURIComponent(template.content);
+            const phoneNumber = building.contactInfo.replace(/\D/g, '');
+            const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
+            window.open(whatsappUrl, '_blank');
+          }
+        });
+      }
+      
+      return state;
+
+    case 'ADD_PROPOSAL':
+      const newProposal: Proposal = {
+        ...action.payload,
+        id: uuidv4(),
+        createdDate: new Date().toISOString(),
+        createdBy: state.currentUser?.name || 'Bilinmeyen',
+      };
+
+      return {
+        ...state,
+        proposals: [...state.proposals, newProposal],
+      };
+
+    case 'UPDATE_PROPOSAL':
+      return {
+        ...state,
+        proposals: state.proposals.map(proposal =>
+          proposal.id === action.payload.id ? action.payload : proposal
+        ),
+      };
+
+    case 'DELETE_PROPOSAL':
+      return {
+        ...state,
+        proposals: state.proposals.filter(proposal => proposal.id !== action.payload),
+      };
+
+    case 'ADD_PAYMENT':
+      const payment: Payment = {
+        ...action.payload,
+        id: uuidv4(),
+      };
+
+      // Update building debt
+      const updatedBuildingsForPayment = state.buildings.map(b =>
+        b.id === action.payload.buildingId
+          ? { ...b, debt: Math.max(0, b.debt - action.payload.amount) }
+          : b
+      );
+
+      // Find the building for debt record
+      const paymentBuilding = state.buildings.find(b => b.id === action.payload.buildingId);
+
+      // Add debt record for payment
+      const paymentDebtRecord: DebtRecord = {
+        id: uuidv4(),
+        buildingId: action.payload.buildingId,
+        date: action.payload.date,
+        type: 'payment',
+        description: `Ödeme alındı`,
+        amount: action.payload.amount,
+        previousDebt: paymentBuilding?.debt || 0,
+        newDebt: Math.max(0, (paymentBuilding?.debt || 0) - action.payload.amount),
+        performedBy: action.payload.receivedBy,
+      };
+
+      return {
+        ...state,
+        payments: [...state.payments, payment],
+        buildings: updatedBuildingsForPayment,
+        debtRecords: [...state.debtRecords, paymentDebtRecord],
+        incomes: [...state.incomes, {
+          id: uuidv4(),
+          buildingId: action.payload.buildingId,
+          amount: action.payload.amount,
+          date: action.payload.date,
+          receivedBy: action.payload.receivedBy,
+        }],
+        updates: [
+          {
+            id: uuidv4(),
+            action: 'Ödeme Alındı',
+            user: state.currentUser?.name || 'Bilinmeyen',
+            timestamp: new Date().toISOString(),
+            details: `${paymentBuilding?.name || 'Bilinmeyen'} binasından ${action.payload.amount.toLocaleString('tr-TR')} ₺ ödeme alındı.`,
+          },
+          ...state.updates,
+        ],
+      };
+
+    case 'ADD_PROPOSAL_TEMPLATE':
+      const newProposalTemplate: ProposalTemplate = {
+        ...action.payload,
+        id: uuidv4(),
+      };
+
+      return {
+        ...state,
+        proposalTemplates: [...state.proposalTemplates, newProposalTemplate],
+      };
+
+    case 'UPDATE_PROPOSAL_TEMPLATE':
+      return {
+        ...state,
+        proposalTemplates: state.proposalTemplates.map(template =>
+          template.id === action.payload.id ? action.payload : template
+        ),
+      };
+
+    case 'DELETE_PROPOSAL_TEMPLATE':
+      return {
+        ...state,
+        proposalTemplates: state.proposalTemplates.filter(template => template.id !== action.payload),
+      };
+
+    case 'ADD_QR_CODE_DATA':
+      const newQRCode: QRCodeData = {
+        ...action.payload,
+        id: uuidv4(),
+      };
+
+      return {
+        ...state,
+        qrCodes: [...state.qrCodes, newQRCode],
+      };
+
+    case 'UPDATE_AUTO_SAVE_DATA':
+      const existingAutoSaveIndex = state.autoSaveData.findIndex(
+        data => data.formType === action.payload.formType && data.userId === action.payload.userId
+      );
+
+      let updatedAutoSaveData;
+      if (existingAutoSaveIndex >= 0) {
+        updatedAutoSaveData = [...state.autoSaveData];
+        updatedAutoSaveData[existingAutoSaveIndex] = action.payload;
+      } else {
+        updatedAutoSaveData = [...state.autoSaveData, action.payload];
+      }
+
+      return {
+        ...state,
+        autoSaveData: updatedAutoSaveData,
+        lastAutoSave: action.payload.timestamp,
+      };
+
+    case 'SHOW_RECEIPT_MODAL':
+      return {
+        ...state,
+        showReceiptModal: true,
+        receiptModalHtml: action.payload,
+      };
+
+    case 'CLOSE_RECEIPT_MODAL':
+      return {
+        ...state,
+        showReceiptModal: false,
+        receiptModalHtml: null,
+      };
+
+    case 'ARCHIVE_RECEIPT':
+      const archivedReceipt: ArchivedReceipt = {
+        ...action.payload,
+        id: uuidv4(),
+      };
+
+      return {
+        ...state,
+        archivedReceipts: [...state.archivedReceipts, archivedReceipt],
+      };
+
+    case 'SHOW_PRINTER_SELECTION':
+      return {
+        ...state,
+        showPrinterSelectionModal: true,
+        printerSelectionContent: action.payload,
+      };
+
+    case 'CLOSE_PRINTER_SELECTION':
+      return {
+        ...state,
+        showPrinterSelectionModal: false,
+        printerSelectionContent: null,
+      };
+
+    case 'INCREASE_PRICES':
+      const percentage = action.payload;
+      const updatedPartsWithIncrease = state.parts.map(part => ({
+        ...part,
+        price: Math.round(part.price * (1 + percentage / 100) * 100) / 100,
+      }));
+
+      return {
+        ...state,
+        parts: updatedPartsWithIncrease,
+        updates: [
+          {
+            id: uuidv4(),
+            action: 'Fiyat Artışı',
+            user: state.currentUser?.name || 'Bilinmeyen',
+            timestamp: new Date().toISOString(),
+            details: `Tüm parça fiyatları %${percentage} artırıldı.`,
+          },
+          ...state.updates,
+        ],
+      };
+
+    default:
+      return state;
+  }
+}
+
+// Helper function to generate maintenance receipt HTML
+function generateMaintenanceReceipt(building: Building, settings: AppState['settings'], technician: string): string {
+  const currentDate = new Date().toLocaleDateString('tr-TR');
+  const currentTime = new Date().toLocaleTimeString('tr-TR', { 
+    hour: '2-digit', 
+    minute: '2-digit' 
+  });
+  const maintenanceFee = building.maintenanceFee * building.elevatorCount;
+  
+  const buildingAddress = building.address ? 
+    `${building.address.mahalle} ${building.address.sokak} ${building.address.binaNo}, ${building.address.ilce}/${building.address.il}` : 
+    'Adres belirtilmemiş';
+
+  const companyAddress = settings.companyAddress ? 
+    `${settings.companyAddress.mahalle} ${settings.companyAddress.sokak} ${settings.companyAddress.binaNo}, ${settings.companyAddress.ilce}/${settings.companyAddress.il}` : 
+    'Adres belirtilmemiş';
+
+  let htmlContent = settings.receiptTemplate || `
+    <div class="receipt">
+      <div class="header">
+        <div class="logo-section">
+          {{LOGO}}
+        </div>
+        <div class="company-details">
+          <div class="company-name">{{COMPANY_NAME}}</div>
+          <div class="certifications">
+            {{CE_EMBLEM}}
+            {{TSE_EMBLEM}}
+          </div>
+        </div>
+        <div class="address-info">
+          <div class="address-text">{{COMPANY_ADDRESS}}</div>
+          <div class="phone-text">Tel: {{COMPANY_PHONE}}</div>
+        </div>
+      </div>
+      
+      <div class="receipt-title">
+        <h1>BAKIM FİŞİ</h1>
+      </div>
+      
+      <div class="building-info">
+        <h2>{{BUILDING_NAME}}</h2>
+        <p>{{BUILDING_ADDRESS}}</p>
+      </div>
+      
+      <div class="maintenance-details">
+        <div class="detail-row">
+          <span class="label">Tarih:</span>
+          <span class="value">{{DATE}}</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Asansör Sayısı:</span>
+          <span class="value">{{ELEVATOR_COUNT}}</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Yapılan İşlem:</span>
+          <span class="value">{{MAINTENANCE_ACTION}}</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Teknisyen:</span>
+          <span class="value">{{TECHNICIAN}}</span>
+        </div>
+      </div>
+      
+      {{PARTS_SECTION}}
+      {{DEBT_SECTION}}
+      
+      <div class="total-section">
+        <div class="total-row">
+          <span class="total-label">Toplam Tutar:</span>
+          <span class="total-value">{{TOTAL_AMOUNT}} ₺</span>
+        </div>
+      </div>
+      
+      <div class="footer">
+        <p>Bu fiş {{TIMESTAMP}} tarihinde oluşturulmuştur.</p>
+        <p>Teşekkür ederiz.</p>
+      </div>
+    </div>
+  `;
+
+  // Process emblem placeholders first
+  if (settings.ceEmblemUrl) {
+    htmlContent = htmlContent.replace(
+      /{{CE_EMBLEM}}/g,
+      `<img src="${settings.ceEmblemUrl}" alt="CE Amblemi" style="max-height: 40px; object-fit: contain; display: inline-block; vertical-align: middle;">`
+    );
+  } else {
+    htmlContent = htmlContent.replace(/{{CE_EMBLEM}}/g, '');
+  }
+
+  if (settings.tseEmblemUrl) {
+    htmlContent = htmlContent.replace(
+      /{{TSE_EMBLEM}}/g,
+      `<img src="${settings.tseEmblemUrl}" alt="TSE Amblemi" style="max-height: 40px; object-fit: contain; display: inline-block; vertical-align: middle;">`
+    );
+  } else {
+    htmlContent = htmlContent.replace(/{{TSE_EMBLEM}}/g, '');
+  }
+
+  // Process other placeholders
+  htmlContent = htmlContent
+    .replace(/{{LOGO}}/g, settings.logo ? `<img src="${settings.logo}" alt="Logo" class="logo">` : '')
+    .replace(/{{COMPANY_NAME}}/g, settings.companyName)
+    .replace(/{{COMPANY_ADDRESS}}/g, companyAddress)
+    .replace(/{{COMPANY_PHONE}}/g, settings.companyPhone)
+    .replace(/{{BUILDING_NAME}}/g, building.name)
+    .replace(/{{BUILDING_ADDRESS}}/g, buildingAddress)
+    .replace(/{{DATE}}/g, `${currentDate} ${currentTime}`)
+    .replace(/{{ELEVATOR_COUNT}}/g, building.elevatorCount.toString())
+    .replace(/{{MAINTENANCE_ACTION}}/g, 'Rutin Bakım')
+    .replace(/{{TECHNICIAN}}/g, technician)
+    .replace(/{{MAINTENANCE_FEE}}/g, `${maintenanceFee.toLocaleString('tr-TR')} ₺`)
+    .replace(/{{PARTS_SECTION}}/g, '')
+    .replace(/{{DEBT_SECTION}}/g, `
+      <div class="debt-section">
+        <div class="section-title">Borç Durumu</div>
+        <p>Yeni borç: ${(building.debt + maintenanceFee).toLocaleString('tr-TR')} ₺</p>
+      </div>
+    `)
+    .replace(/{{TOTAL_AMOUNT}}/g, maintenanceFee.toLocaleString('tr-TR'))
+    .replace(/{{TIMESTAMP}}/g, new Date().toLocaleString('tr-TR'));
+
+  return htmlContent;
+}
+
+const AppContext = createContext<{
   state: AppState;
-  setUser: (name: string) => void;
-  deleteUser: (userId: string) => void;
   addBuilding: (building: Omit<Building, 'id'>) => void;
   updateBuilding: (building: Building) => void;
   deleteBuilding: (id: string) => void;
-  toggleMaintenance: (id: string, showReceipt?: boolean) => void;
   addPart: (part: Omit<Part, 'id'>) => void;
   updatePart: (part: Part) => void;
   deletePart: (id: string) => void;
-  increasePrices: (percentage: number) => void;
   installPart: (installation: Omit<PartInstallation, 'id' | 'installedBy'>) => void;
   installManualPart: (installation: Omit<ManualPartInstallation, 'id' | 'installedBy'>) => void;
   markPartAsPaid: (installationId: string, isManual: boolean) => void;
-  payDebt: (buildingId: string, amount: number) => void;
+  addUpdate: (update: Omit<Update, 'id' | 'timestamp'>) => void;
+  addIncome: (income: Omit<Income, 'id'>) => void;
+  setUser: (name: string) => void;
+  deleteUser: (id: string) => void;
+  addNotification: (notification: string) => void;
+  clearNotifications: () => void;
   toggleSidebar: () => void;
-  updateSettings: (settings: Partial<AppSettings>) => void;
+  toggleMaintenance: (buildingId: string, showReceipt?: boolean) => void;
+  reportFault: (buildingId: string, faultData: { description: string; severity: 'low' | 'medium' | 'high'; reportedBy: string }) => void;
+  updateSettings: (settings: Partial<AppState['settings']>) => void;
+  resetMaintenanceStatus: () => void;
   addFaultReport: (buildingId: string, reporterName: string, reporterSurname: string, reporterPhone: string, apartmentNo: string, description: string) => void;
-  resolveFaultReport: (faultReportId: string) => void;
-  printMaintenanceReceipt: (buildingId: string) => void;
+  resolveFaultReport: (id: string) => void;
+  addMaintenanceHistory: (history: Omit<MaintenanceHistory, 'id'>) => void;
+  addMaintenanceRecord: (record: Omit<MaintenanceRecord, 'id'>) => void;
   addPrinter: (printer: Omit<Printer, 'id'>) => void;
   updatePrinter: (printer: Printer) => void;
   deletePrinter: (id: string) => void;
-  clearNotifications: () => void;
   addSMSTemplate: (template: Omit<SMSTemplate, 'id'>) => void;
   updateSMSTemplate: (template: SMSTemplate) => void;
   deleteSMSTemplate: (id: string) => void;
@@ -392,1242 +1309,308 @@ interface AppContextProps {
   addProposalTemplate: (template: Omit<ProposalTemplate, 'id'>) => void;
   updateProposalTemplate: (template: ProposalTemplate) => void;
   deleteProposalTemplate: (id: string) => void;
-  reportFault: (buildingId: string, faultData: { description: string; severity: 'low' | 'medium' | 'high'; reportedBy: string }) => void;
+  addQRCodeData: (qrData: Omit<QRCodeData, 'id'>) => void;
   updateAutoSaveData: (data: AutoSaveData) => void;
-  openReceiptModal: (html: string) => void;
+  showReceiptModal: (htmlContent: string) => void;
   closeReceiptModal: () => void;
-  addQRCodeData: (qrCodeData: any) => void;
-  showPrinterSelection: (htmlContent: string) => void;
-}
+  archiveReceipt: (receipt: Omit<ArchivedReceipt, 'id'>) => void;
+  showPrinterSelection: (content: string) => void;
+  closePrinterSelection: () => void;
+  increasePrices: (percentage: number) => void;
+} | undefined>(undefined);
 
-const AppContext = createContext<AppContextProps | undefined>(undefined);
-
-export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [state, setState] = useState<AppState>(() => {
-    const savedState = localStorage.getItem('appState');
-    if (savedState) {
-      const parsedState = JSON.parse(savedState);
-      // Migrate old data structures
-      const migratedBuildings = parsedState.buildings?.map((building: any) => {
-        if (typeof building.address === 'string') {
-          return {
-            ...building,
-            address: {
-              mahalle: '',
-              sokak: '',
-              il: '',
-              ilce: '',
-              binaNo: ''
-            },
-            elevatorCount: building.elevatorCount || 1,
-            label: building.label || null
-          };
-        }
-        return {
-          ...building,
-          elevatorCount: building.elevatorCount || 1,
-          label: building.label || null
-        };
-      }) || [];
-      
-      return {
-        ...initialAppState,
-        ...parsedState,
-        buildings: migratedBuildings,
-        settings: {
-          ...initialSettings,
-          ...parsedState.settings,
-          companyAddress: parsedState.settings?.companyAddress || initialSettings.companyAddress,
-          installationProposalTemplate: parsedState.settings?.installationProposalTemplate || initialSettings.installationProposalTemplate,
-          maintenanceProposalTemplate: parsedState.settings?.maintenanceProposalTemplate || initialSettings.maintenanceProposalTemplate,
-          revisionProposalTemplate: parsedState.settings?.revisionProposalTemplate || initialSettings.revisionProposalTemplate
-        },
-        maintenanceRecords: parsedState.maintenanceRecords || [],
-        smsTemplates: parsedState.smsTemplates || [],
-        proposals: parsedState.proposals || [],
-        payments: parsedState.payments || [],
-        manualPartInstallations: parsedState.manualPartInstallations || [],
-        debtRecords: parsedState.debtRecords || [],
-        proposalTemplates: parsedState.proposalTemplates || initialProposalTemplates,
-        showReceiptModal: false,
-        receiptModalHtml: null,
-      };
-    }
-    return initialAppState;
-  });
-
-  // Initialize sample parts if none exist
-  useEffect(() => {
-    if (state.parts.length === 0) {
-      setState(prev => ({
-        ...prev,
-        parts: sampleParts.map(part => ({ ...part, id: uuidv4() }))
-      }));
-    }
-  }, []);
-
-  // Check for monthly maintenance reset
-  useEffect(() => {
-    const now = new Date();
-    const currentMonth = `${now.getFullYear()}-${now.getMonth()}`;
-    
-    if (state.lastMaintenanceReset !== currentMonth) {
-      setState(prev => ({
-        ...prev,
-        buildings: prev.buildings.map(building => ({
-          ...building,
-          isMaintained: false
-        })),
-        lastMaintenanceReset: currentMonth,
-        notifications: [
-          'Aylık bakım durumu sıfırlandı',
-          ...prev.notifications
-        ],
-        unreadNotifications: prev.unreadNotifications + 1
-      }));
-    }
-  }, [state.lastMaintenanceReset]);
-
-  // Save state to localStorage when it changes
-  useEffect(() => {
-    localStorage.setItem('appState', JSON.stringify(state));
-  }, [state]);
-
-  const addDebtRecord = (buildingId: string, type: 'maintenance' | 'part' | 'payment', description: string, amount: number, performedBy?: string) => {
-    const building = state.buildings.find(b => b.id === buildingId);
-    if (!building) return;
-
-    const debtRecord: DebtRecord = {
-      id: uuidv4(),
-      buildingId,
-      date: new Date().toISOString(),
-      type,
-      description,
-      amount,
-      previousDebt: building.debt,
-      newDebt: type === 'payment' ? building.debt - amount : building.debt + amount,
-      performedBy
-    };
-
-    setState(prev => ({
-      ...prev,
-      debtRecords: [debtRecord, ...prev.debtRecords]
-    }));
-  };
-
-  const addUpdate = (action: string, details: string) => {
-    if (!state.currentUser) return;
-    
-    const update = {
-      id: uuidv4(),
-      action,
-      user: state.currentUser.name,
-      timestamp: new Date().toISOString(),
-      details,
-    };
-    
-    setState(prev => ({
-      ...prev,
-      updates: [update, ...prev.updates],
-      notifications: [details, ...prev.notifications],
-      unreadNotifications: prev.unreadNotifications + 1,
-    }));
-  };
-
-  const setUser = (name: string) => {
-    const existingUser = state.users.find(user => user.name === name);
-    
-    if (existingUser) {
-      setState(prev => ({
-        ...prev,
-        currentUser: existingUser,
-      }));
-    } else {
-      const newUser = { id: uuidv4(), name };
-      setState(prev => ({
-        ...prev,
-        currentUser: newUser,
-        users: [...prev.users, newUser],
-      }));
-    }
-  };
-
-  const deleteUser = (userId: string) => {
-    setState(prev => ({
-      ...prev,
-      users: prev.users.filter(user => user.id !== userId),
-    }));
-    
-    addUpdate('Kullanıcı Silindi', `Kullanıcı silindi`);
-  };
+export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [state, dispatch] = useReducer(appReducer, initialState);
 
   const addBuilding = (building: Omit<Building, 'id'>) => {
-    const newBuilding = {
-      ...building,
-      id: uuidv4(),
-      elevatorCount: building.elevatorCount || 1,
-      label: building.label || null
-    };
-    
-    setState(prev => ({
-      ...prev,
-      buildings: [...prev.buildings, newBuilding],
-    }));
-
-    // Add initial debt record if there's debt
-    if (building.debt > 0) {
-      addDebtRecord(newBuilding.id, 'maintenance', 'Başlangıç borcu', building.debt);
-    }
-    
-    addUpdate('Bina Eklendi', `${newBuilding.name} eklendi`);
+    dispatch({ type: 'ADD_BUILDING', payload: building });
   };
 
   const updateBuilding = (building: Building) => {
-    setState(prev => ({
-      ...prev,
-      buildings: prev.buildings.map(b => 
-        b.id === building.id ? building : b
-      ),
-    }));
-    
-    addUpdate('Bina Güncellendi', `${building.name} güncellendi`);
+    dispatch({ type: 'UPDATE_BUILDING', payload: building });
   };
 
   const deleteBuilding = (id: string) => {
-    const building = state.buildings.find(b => b.id === id);
-    if (!building) return;
-    
-    setState(prev => ({
-      ...prev,
-      buildings: prev.buildings.filter(b => b.id !== id),
-    }));
-    
-    addUpdate('Bina Silindi', `${building.name} silindi`);
-  };
-
-  const toggleMaintenance = (id: string, showReceipt: boolean = false) => {
-    const building = state.buildings.find(b => b.id === id);
-    if (!building || !state.currentUser) return;
-    
-    const now = new Date();
-    const currentMonth = `${now.getFullYear()}-${now.getMonth()}`;
-    
-    // Check if maintenance was already done this month
-    const lastMaintenanceMonth = building.lastMaintenanceDate 
-      ? `${new Date(building.lastMaintenanceDate).getFullYear()}-${new Date(building.lastMaintenanceDate).getMonth()}`
-      : null;
-    
-    const isMaintained = !building.isMaintained;
-    const lastMaintenanceDate = isMaintained ? now.toISOString() : building.lastMaintenanceDate;
-    const lastMaintenanceTime = isMaintained ? now.toLocaleTimeString('tr-TR') : building.lastMaintenanceTime;
-    
-    let debt = building.debt;
-    let maintenanceHistory = [...state.maintenanceHistory];
-    let maintenanceRecords = [...state.maintenanceRecords];
-    
-    // Only add debt if it's the first time this month (but don't add to income)
-    if (isMaintained && lastMaintenanceMonth !== currentMonth) {
-      const totalMaintenanceFee = building.maintenanceFee * building.elevatorCount;
-      debt += totalMaintenanceFee;
-
-      // Add debt record
-      addDebtRecord(building.id, 'maintenance', `Bakım ücreti (${building.elevatorCount} asansör)`, totalMaintenanceFee, state.currentUser.name);
-
-      // Add to maintenance history
-      const maintenanceRecord: MaintenanceHistory = {
-        id: uuidv4(),
-        buildingId: building.id,
-        maintenanceDate: now.toISOString(),
-        maintenanceTime: now.toLocaleTimeString('tr-TR'),
-        performedBy: state.currentUser.name,
-        maintenanceFee: totalMaintenanceFee,
-        notes: `${building.name} bakım işlemi tamamlandı (${building.elevatorCount} asansör)`
-      };
-
-      maintenanceHistory = [maintenanceRecord, ...maintenanceHistory];
-
-      // Add to maintenance records for tracking
-      const record: MaintenanceRecord = {
-        id: uuidv4(),
-        buildingId: building.id,
-        performedBy: state.currentUser.name,
-        maintenanceDate: now.toISOString(),
-        maintenanceTime: now.toLocaleTimeString('tr-TR'),
-        elevatorCount: building.elevatorCount,
-        totalFee: totalMaintenanceFee,
-        status: 'completed',
-        priority: 'medium',
-        searchableText: `${building.name} ${state.currentUser.name} bakım`
-      };
-
-      maintenanceRecords = [record, ...maintenanceRecords];
-    }
-    
-    setState(prev => ({
-      ...prev,
-      buildings: prev.buildings.map(b => 
-        b.id === id 
-          ? { ...b, isMaintained, lastMaintenanceDate, lastMaintenanceTime, debt }
-          : b
-      ),
-      maintenanceHistory,
-      maintenanceRecords,
-    }));
-    
-    if (showReceipt && isMaintained) {
-      // Show receipt preview
-      showReceiptPreview(id);
-    }
-    
-    addUpdate(
-      'Bakım Durumu Değişti', 
-      `${building.name} bakım durumu ${isMaintained ? 'yapıldı' : 'yapılmadı'} olarak güncellendi`
-    );
-  };
-
-  const showReceiptPreview = (buildingId: string) => {
-    const building = state.buildings.find(b => b.id === buildingId);
-    if (!building || !state.currentUser) return;
-
-    const now = new Date();
-    
-    // Get current month parts for this building
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    const monthlyParts = state.partInstallations.filter(installation => {
-      const installDate = new Date(installation.installDate);
-      return installation.buildingId === buildingId &&
-             installDate.getMonth() === currentMonth &&
-             installDate.getFullYear() === currentYear;
-    });
-
-    const monthlyManualParts = state.manualPartInstallations.filter(installation => {
-      const installDate = new Date(installation.installDate);
-      return installation.buildingId === buildingId &&
-             installDate.getMonth() === currentMonth &&
-             installDate.getFullYear() === currentYear;
-    });
-
-    // Create full address string
-    const fullAddress = building.address ? 
-      `${building.address.mahalle} ${building.address.sokak} ${building.address.binaNo}, ${building.address.ilce}/${building.address.il}` : 
-      'Adres belirtilmemiş';
-
-    const companyAddress = state.settings?.companyAddress ? 
-      `${state.settings.companyAddress.mahalle} ${state.settings.companyAddress.sokak} ${state.settings.companyAddress.binaNo}, ${state.settings.companyAddress.ilce}/${state.settings.companyAddress.il}` : 
-      'Adres belirtilmemiş';
-
-    const totalMaintenanceFee = building.maintenanceFee * building.elevatorCount;
-    const partsTotal = monthlyParts.reduce((sum, installation) => {
-      const part = state.parts.find(p => p.id === installation.partId);
-      return sum + (part ? part.price * installation.quantity : 0);
-    }, 0) + monthlyManualParts.reduce((sum, installation) => sum + installation.totalPrice, 0);
-    
-    const grandTotal = totalMaintenanceFee + partsTotal + building.debt;
-
-    // Create receipt content using template
-    let receiptContent = state.settings?.receiptTemplate || initialSettings.receiptTemplate;
-    
-    // Replace template variables
-    receiptContent = receiptContent
-      .replace(/{{LOGO}}/g, state.settings?.logo ? `<img src="${state.settings.logo}" alt="Logo" class="logo">` : '')
-      .replace(/{{COMPANY_NAME}}/g, state.settings?.companyName || 'Asansör Bakım Servisi')
-      .replace(/{{COMPANY_ADDRESS}}/g, companyAddress)
-      .replace(/{{COMPANY_PHONE}}/g, state.settings?.companyPhone || '0555 123 45 67')
-      .replace(/{{DATE}}/g, now.toLocaleDateString('tr-TR'))
-      .replace(/{{BUILDING_NAME}}/g, building.name)
-      .replace(/{{BUILDING_ADDRESS}}/g, fullAddress)
-      .replace(/{{ELEVATOR_COUNT}}/g, building.elevatorCount.toString())
-      .replace(/{{MAINTENANCE_ACTION}}/g, building.elevatorCount > 1 ? 'Bakımlar Yapıldı' : 'Bakım Yapıldı')
-      .replace(/{{TECHNICIAN}}/g, state.currentUser.name)
-      .replace(/{{MAINTENANCE_FEE}}/g, `${building.elevatorCount} x ${building.maintenanceFee.toLocaleString('tr-TR')} ₺ = ${totalMaintenanceFee.toLocaleString('tr-TR')} ₺`)
-      .replace(/{{TOTAL_AMOUNT}}/g, `${grandTotal.toLocaleString('tr-TR')} ₺`);
-
-    // Handle parts section
-    let partsSection = '';
-    if (monthlyParts.length > 0 || monthlyManualParts.length > 0) {
-      partsSection = `
-        <div class="parts-section">
-          <div class="parts-title">Kullanılan Parçalar:</div>
-          ${monthlyParts.map(installation => {
-            const part = state.parts.find(p => p.id === installation.partId);
-            return part ? `
-              <div class="part-item">
-                <span><strong>${part.name}</strong> - ${installation.quantity} adet</span>
-                <span>${(part.price * installation.quantity).toLocaleString('tr-TR')} ₺</span>
-              </div>
-            ` : '';
-          }).join('')}
-          ${monthlyManualParts.map(installation => `
-            <div class="part-item">
-              <span><strong>${installation.partName}</strong> - ${installation.quantity} adet</span>
-              <span>${installation.totalPrice.toLocaleString('tr-TR')} ₺</span>
-            </div>
-          `).join('')}
-          <div class="part-item" style="border-top: 2px solid #333; margin-top: 10px; padding-top: 10px;">
-            <span><strong>Parça Toplam:</strong></span>
-            <span><strong>${partsTotal.toLocaleString('tr-TR')} ₺</strong></span>
-          </div>
-        </div>
-      `;
-    }
-
-    // Handle debt section
-    let debtSection = '';
-    if (building.debt > 0) {
-      debtSection = `
-        <div class="parts-section">
-          <div class="info-row">
-            <span class="label">Önceki Borç:</span>
-            <span class="value">${building.debt.toLocaleString('tr-TR')} ₺</span>
-          </div>
-        </div>
-      `;
-    }
-
-    receiptContent = receiptContent
-      .replace(/{{PARTS_SECTION}}/g, partsSection)
-      .replace(/{{DEBT_SECTION}}/g, debtSection);
-
-    const fullReceiptHTML = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Bakım Fişi - ${building.name}</title>
-          <style>
-            body { 
-              font-family: Arial, sans-serif; 
-              max-width: 800px; 
-              margin: 0 auto; 
-              padding: 20px;
-              background: #f5f5f5;
-            }
-            .receipt {
-              background: white;
-              padding: 30px;
-              border-radius: 8px;
-              box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            }
-            .header { 
-              display: flex;
-              justify-content: space-between;
-              align-items: flex-start;
-              border-bottom: 2px solid #333; 
-              padding-bottom: 20px; 
-              margin-bottom: 30px; 
-            }
-            .company-info {
-              flex: 1;
-              text-align: center;
-            }
-            .logo-section {
-              margin-bottom: 15px;
-            }
-            .logo { 
-              max-height: 80px; 
-              max-width: 200px;
-              margin: 0 auto;
-              display: block;
-            }
-            .company-details {
-              text-align: center;
-            }
-            .company-name { 
-              font-size: 28px; 
-              font-weight: bold; 
-              color: #333; 
-              margin: 15px 0 10px 0;
-            }
-            .certifications {
-              font-size: 14px;
-              color: #666;
-              font-weight: bold;
-              margin-bottom: 10px;
-            }
-            .address-info {
-              text-align: right;
-              font-size: 14px;
-              color: #333;
-              min-width: 200px;
-            }
-            .address-label {
-              font-weight: bold;
-              margin-bottom: 5px;
-            }
-            .address-text {
-              margin-bottom: 5px;
-              line-height: 1.4;
-            }
-            .phone-text {
-              margin-bottom: 10px;
-              font-weight: bold;
-            }
-            .date-info {
-              font-size: 16px;
-              font-weight: bold;
-            }
-            .content { 
-              margin-bottom: 30px; 
-            }
-            .section-title {
-              font-size: 18px;
-              font-weight: bold;
-              text-align: center;
-              margin: 20px 0 15px 0;
-              color: #333;
-              border-bottom: 1px solid #ddd;
-              padding-bottom: 5px;
-            }
-            .maintenance-info {
-              background: #f9f9f9;
-              padding: 15px;
-              border-radius: 5px;
-              margin: 15px 0;
-            }
-            .info-row { 
-              display: flex; 
-              justify-content: space-between; 
-              margin-bottom: 10px; 
-              padding: 8px 0;
-              border-bottom: 1px dotted #ccc;
-            }
-            .label { 
-              font-weight: bold; 
-              color: #333; 
-            }
-            .value { 
-              color: #666; 
-            }
-            .parts-section {
-              margin: 20px 0;
-              padding: 15px;
-              background: #f9f9f9;
-              border-radius: 5px;
-            }
-            .parts-title {
-              font-weight: bold;
-              margin-bottom: 10px;
-              color: #333;
-            }
-            .part-item {
-              margin: 5px 0;
-              padding: 5px 0;
-              border-bottom: 1px dotted #ddd;
-              display: flex;
-              justify-content: space-between;
-            }
-            .total-section {
-              font-size: 20px;
-              font-weight: bold;
-              color: #2563eb;
-              text-align: center;
-              margin: 20px 0;
-              padding: 15px;
-              background: #eff6ff;
-              border-radius: 5px;
-              border: 2px solid #2563eb;
-            }
-            .warnings {
-              margin-top: 30px;
-              padding: 20px;
-              background: #fef3c7;
-              border-radius: 5px;
-              border-left: 4px solid #f59e0b;
-            }
-            .warning-title {
-              font-size: 18px;
-              font-weight: bold;
-              color: #92400e;
-              margin-bottom: 15px;
-              text-align: center;
-            }
-            .warning-text {
-              font-size: 14px;
-              color: #92400e;
-              line-height: 1.6;
-              margin-bottom: 15px;
-            }
-            .footer { 
-              border-top: 2px solid #333; 
-              padding-top: 20px; 
-              text-align: center; 
-              margin-top: 30px;
-            }
-            .thank-you {
-              font-size: 18px;
-              font-weight: bold;
-              color: #333;
-            }
-            @media print {
-              body { background: white; }
-              .receipt { box-shadow: none; }
-            }
-          </style>
-        </head>
-        <body>
-          ${receiptContent}
-        </body>
-      </html>
-    `;
-
-    // Open receipt modal
-    openReceiptModal(fullReceiptHTML);
-
-    // Save receipt to history
-    const receipt: MaintenanceReceipt = {
-      id: uuidv4(),
-      buildingId,
-      maintenanceDate: now.toISOString(),
-      maintenanceTime: now.toLocaleTimeString('tr-TR'),
-      performedBy: state.currentUser.name,
-      maintenanceFee: totalMaintenanceFee,
-      notes: `${building.name} bakım fişi oluşturuldu`
-    };
-
-    setState(prev => ({
-      ...prev,
-      maintenanceReceipts: [receipt, ...prev.maintenanceReceipts]
-    }));
-
-    addUpdate('Bakım Fişi Oluşturuldu', `${building.name} için bakım fişi oluşturuldu`);
-  };
-
-  const openReceiptModal = (html: string) => {
-    setState(prev => ({
-      ...prev,
-      showReceiptModal: true,
-      receiptModalHtml: html
-    }));
-  };
-
-  const closeReceiptModal = () => {
-    setState(prev => ({
-      ...prev,
-      showReceiptModal: false,
-      receiptModalHtml: null
-    }));
+    dispatch({ type: 'DELETE_BUILDING', payload: id });
   };
 
   const addPart = (part: Omit<Part, 'id'>) => {
-    const newPart = {
-      ...part,
-      id: uuidv4(),
-    };
-    
-    setState(prev => ({
-      ...prev,
-      parts: [...prev.parts, newPart],
-    }));
-    
-    addUpdate('Parça Eklendi', `${newPart.name} eklendi`);
+    dispatch({ type: 'ADD_PART', payload: part });
   };
 
   const updatePart = (part: Part) => {
-    setState(prev => ({
-      ...prev,
-      parts: prev.parts.map(p => 
-        p.id === part.id ? part : p
-      ),
-    }));
-    
-    addUpdate('Parça Güncellendi', `${part.name} güncellendi`);
+    dispatch({ type: 'UPDATE_PART', payload: part });
   };
 
   const deletePart = (id: string) => {
-    const part = state.parts.find(p => p.id === id);
-    if (!part) return;
-    
-    setState(prev => ({
-      ...prev,
-      parts: prev.parts.filter(p => p.id !== id),
-    }));
-    
-    addUpdate('Parça Silindi', `${part.name} silindi`);
-  };
-
-  const increasePrices = (percentage: number) => {
-    if (percentage <= 0) return;
-    
-    setState(prev => ({
-      ...prev,
-      parts: prev.parts.map(p => ({
-        ...p,
-        price: Math.round(p.price * (1 + percentage / 100)),
-      })),
-    }));
-    
-    addUpdate('Fiyat Artışı', `Tüm parça fiyatları %${percentage} artırıldı`);
+    dispatch({ type: 'DELETE_PART', payload: id });
   };
 
   const installPart = (installation: Omit<PartInstallation, 'id' | 'installedBy'>) => {
-    if (!state.currentUser) return;
-    
-    const part = state.parts.find(p => p.id === installation.partId);
-    const building = state.buildings.find(b => b.id === installation.buildingId);
-    
-    if (!part || !building) return;
-    
-    if (part.quantity < installation.quantity) {
-      addUpdate('Hata', `${part.name} stokta yeterli sayıda yok`);
-      return;
-    }
-    
-    const newInstallation = {
-      ...installation,
-      id: uuidv4(),
-      installedBy: state.currentUser.name,
-      isPaid: false,
-    };
-
-    const totalCost = part.price * installation.quantity;
-    
-    setState(prev => ({
-      ...prev,
-      partInstallations: [...prev.partInstallations, newInstallation],
-      parts: prev.parts.map(p => 
-        p.id === part.id 
-          ? { ...p, quantity: p.quantity - installation.quantity }
-          : p
-      ),
-      buildings: prev.buildings.map(b =>
-        b.id === building.id
-          ? { ...b, debt: b.debt + totalCost }
-          : b
-      )
-    }));
-
-    // Add debt record for part installation
-    addDebtRecord(building.id, 'part', `${part.name} (${installation.quantity} adet)`, totalCost, state.currentUser.name);
-    
-    addUpdate(
-      'Parça Takıldı', 
-      `${building.name} binasına ${installation.quantity} adet ${part.name} takıldı`
-    );
+    dispatch({ type: 'INSTALL_PART', payload: installation });
   };
 
   const installManualPart = (installation: Omit<ManualPartInstallation, 'id' | 'installedBy'>) => {
-    if (!state.currentUser) return;
-    
-    const building = state.buildings.find(b => b.id === installation.buildingId);
-    if (!building) return;
-    
-    const newInstallation = {
-      ...installation,
-      id: uuidv4(),
-      installedBy: state.currentUser.name,
-      isPaid: false,
-    };
-    
-    setState(prev => ({
-      ...prev,
-      manualPartInstallations: [...prev.manualPartInstallations, newInstallation],
-      buildings: prev.buildings.map(b =>
-        b.id === building.id
-          ? { ...b, debt: b.debt + installation.totalPrice }
-          : b
-      )
-    }));
-
-    // Add debt record for manual part installation
-    addDebtRecord(building.id, 'part', `${installation.partName} (${installation.quantity} adet)`, installation.totalPrice, state.currentUser.name);
-    
-    addUpdate(
-      'Manuel Parça Takıldı', 
-      `${building.name} binasına ${installation.quantity} adet ${installation.partName} takıldı`
-    );
+    dispatch({ type: 'INSTALL_MANUAL_PART', payload: installation });
   };
 
   const markPartAsPaid = (installationId: string, isManual: boolean) => {
-    if (!state.currentUser) return;
-
-    const now = new Date().toISOString();
-
-    if (isManual) {
-      setState(prev => ({
-        ...prev,
-        manualPartInstallations: prev.manualPartInstallations.map(installation =>
-          installation.id === installationId
-            ? { ...installation, isPaid: true, paymentDate: now }
-            : installation
-        )
-      }));
-    } else {
-      setState(prev => ({
-        ...prev,
-        partInstallations: prev.partInstallations.map(installation =>
-          installation.id === installationId
-            ? { ...installation, isPaid: true, paymentDate: now }
-            : installation
-        )
-      }));
-    }
-
-    addUpdate('Parça Ödemesi', 'Parça ödemesi olarak işaretlendi');
+    dispatch({ type: 'MARK_PART_AS_PAID', payload: { installationId, isManual } });
   };
 
-  const payDebt = (buildingId: string, amount: number) => {
-    const building = state.buildings.find(b => b.id === buildingId);
-    if (!building || amount <= 0 || amount > building.debt || !state.currentUser) return;
-    
-    // Add to income when payment is received
-    const newIncome = {
-      id: uuidv4(),
-      buildingId,
-      amount,
-      date: new Date().toISOString(),
-      receivedBy: state.currentUser.name,
-    };
-    
-    setState(prev => ({
-      ...prev,
-      buildings: prev.buildings.map(b => 
-        b.id === buildingId 
-          ? { ...b, debt: b.debt - amount }
-          : b
-      ),
-      incomes: [newIncome, ...prev.incomes],
-    }));
-
-    // Add debt record for payment
-    addDebtRecord(buildingId, 'payment', `Ödeme alındı`, amount, state.currentUser.name);
-    
-    addUpdate(
-      'Borç Ödendi', 
-      `${building.name} binasının ${amount} TL borcu ödendi`
-    );
+  const addUpdate = (update: Omit<Update, 'id' | 'timestamp'>) => {
+    dispatch({ type: 'ADD_UPDATE', payload: update });
   };
 
-  const addPayment = (payment: Omit<Payment, 'id'>) => {
-    const building = state.buildings.find(b => b.id === payment.buildingId);
-    if (!building || payment.amount <= 0 || payment.amount > building.debt) return;
-    
-    const newPayment = {
-      ...payment,
-      id: uuidv4(),
-    };
-    
-    // Add to income
-    const newIncome = {
-      id: uuidv4(),
-      buildingId: payment.buildingId,
-      amount: payment.amount,
-      date: payment.date,
-      receivedBy: payment.receivedBy,
-    };
-    
-    setState(prev => ({
-      ...prev,
-      buildings: prev.buildings.map(b => 
-        b.id === payment.buildingId 
-          ? { ...b, debt: b.debt - payment.amount }
-          : b
-      ),
-      payments: [newPayment, ...prev.payments],
-      incomes: [newIncome, ...prev.incomes],
-    }));
-
-    // Add debt record for payment
-    addDebtRecord(payment.buildingId, 'payment', `Ödeme alındı - ${payment.notes || ''}`, payment.amount, payment.receivedBy);
-    
-    addUpdate(
-      'Ödeme Alındı', 
-      `${building?.name} binasından ${payment.amount} TL ödeme alındı`
-    );
+  const addIncome = (income: Omit<Income, 'id'>) => {
+    dispatch({ type: 'ADD_INCOME', payload: income });
   };
 
-  const toggleSidebar = () => {
-    setState(prev => ({
-      ...prev,
-      sidebarOpen: !prev.sidebarOpen
-    }));
+  const setUser = (name: string) => {
+    dispatch({ type: 'SET_USER', payload: name });
   };
 
-  const updateSettings = (settings: Partial<AppSettings>) => {
-    setState(prev => ({
-      ...prev,
-      settings: {
-        ...prev.settings,
-        ...settings
-      }
-    }));
-    
-    addUpdate('Ayarlar Güncellendi', 'Uygulama ayarları güncellendi');
+  const deleteUser = (id: string) => {
+    dispatch({ type: 'DELETE_USER', payload: id });
   };
 
-  const addFaultReport = (buildingId: string, reporterName: string, reporterSurname: string, reporterPhone: string, apartmentNo: string, description: string) => {
-    const building = state.buildings.find(b => b.id === buildingId);
-    if (!building) return;
-
-    const newFaultReport: FaultReport = {
-      id: uuidv4(),
-      buildingId,
-      reporterName,
-      reporterSurname,
-      reporterPhone,
-      apartmentNo,
-      description,
-      timestamp: new Date().toISOString(),
-      status: 'pending'
-    };
-
-    setState(prev => ({
-      ...prev,
-      faultReports: [newFaultReport, ...prev.faultReports],
-      buildings: prev.buildings.map(b => 
-        b.id === buildingId ? { ...b, isDefective: true } : b
-      ),
-      notifications: [
-        `${building.name} binasında arıza bildirimi: ${reporterName} ${reporterSurname} tarafından bildirildi`,
-        ...prev.notifications
-      ],
-      unreadNotifications: prev.unreadNotifications + 1
-    }));
-
-    addUpdate(
-      'Arıza Bildirimi', 
-      `${building.name} binasında arıza bildirimi alındı - ${reporterName} ${reporterSurname} (Daire: ${apartmentNo})`
-    );
-  };
-
-  const resolveFaultReport = (faultReportId: string) => {
-    const faultReport = state.faultReports.find(fr => fr.id === faultReportId);
-    if (!faultReport) return;
-
-    const building = state.buildings.find(b => b.id === faultReport.buildingId);
-    if (!building) return;
-
-    setState(prev => ({
-      ...prev,
-      faultReports: prev.faultReports.map(fr => 
-        fr.id === faultReportId ? { ...fr, status: 'resolved' } : fr
-      ),
-      buildings: prev.buildings.map(b => 
-        b.id === faultReport.buildingId ? { ...b, isDefective: false } : b
-      )
-    }));
-
-    addUpdate(
-      'Arıza Çözüldü', 
-      `${building.name} binasının arızası çözüldü`
-    );
-  };
-
-  const printMaintenanceReceipt = (buildingId: string) => {
-    showReceiptPreview(buildingId);
-  };
-
-  const addPrinter = (printer: Omit<Printer, 'id'>) => {
-    const newPrinter = {
-      ...printer,
-      id: uuidv4(),
-    };
-
-    setState(prev => ({
-      ...prev,
-      printers: [
-        ...prev.printers.map(p => ({ ...p, isDefault: printer.isDefault ? false : p.isDefault })),
-        newPrinter
-      ],
-    }));
-
-    addUpdate('Yazıcı Eklendi', `${newPrinter.name} yazıcısı eklendi`);
-  };
-
-  const updatePrinter = (printer: Printer) => {
-    setState(prev => ({
-      ...prev,
-      printers: prev.printers.map(p => {
-        if (p.id === printer.id) {
-          return printer;
-        }
-        if (printer.isDefault && p.isDefault) {
-          return { ...p, isDefault: false };
-        }
-        return p;
-      }),
-    }));
-
-    addUpdate('Yazıcı Güncellendi', `${printer.name} yazıcısı güncellendi`);
-  };
-
-  const deletePrinter = (id: string) => {
-    const printer = state.printers.find(p => p.id === id);
-    if (!printer) return;
-
-    setState(prev => ({
-      ...prev,
-      printers: prev.printers.filter(p => p.id !== id),
-    }));
-
-    addUpdate('Yazıcı Silindi', `${printer.name} yazıcısı silindi`);
+  const addNotification = (notification: string) => {
+    dispatch({ type: 'ADD_NOTIFICATION', payload: notification });
   };
 
   const clearNotifications = () => {
-    setState(prev => ({
-      ...prev,
-      unreadNotifications: 0,
-    }));
+    dispatch({ type: 'CLEAR_NOTIFICATIONS' });
   };
 
-  const addSMSTemplate = (template: Omit<SMSTemplate, 'id'>) => {
-    const newTemplate = {
-      ...template,
-      id: uuidv4(),
-    };
-
-    setState(prev => ({
-      ...prev,
-      smsTemplates: [...prev.smsTemplates, newTemplate],
-    }));
-
-    addUpdate('SMS Şablonu Eklendi', `${newTemplate.name} şablonu eklendi`);
+  const toggleSidebar = () => {
+    dispatch({ type: 'TOGGLE_SIDEBAR' });
   };
 
-  const updateSMSTemplate = (template: SMSTemplate) => {
-    setState(prev => ({
-      ...prev,
-      smsTemplates: prev.smsTemplates.map(t => 
-        t.id === template.id ? template : t
-      ),
-    }));
-
-    addUpdate('SMS Şablonu Güncellendi', `${template.name} şablonu güncellendi`);
-  };
-
-  const deleteSMSTemplate = (id: string) => {
-    const template = state.smsTemplates.find(t => t.id === id);
-    if (!template) return;
-
-    setState(prev => ({
-      ...prev,
-      smsTemplates: prev.smsTemplates.filter(t => t.id !== id),
-    }));
-
-    addUpdate('SMS Şablonu Silindi', `${template.name} şablonu silindi`);
-  };
-
-  const sendBulkSMS = (templateId: string, buildingIds: string[]) => {
-    const template = state.smsTemplates.find(t => t.id === templateId);
-    if (!template) return;
-
-    const buildings = state.buildings.filter(b => buildingIds.includes(b.id));
-    
-    // Simulate SMS sending
-    addUpdate(
-      'Toplu SMS Gönderildi', 
-      `${buildings.length} binaya "${template.name}" şablonu ile SMS gönderildi`
-    );
-  };
-
-  const sendWhatsApp = (templateId: string, buildingIds: string[]) => {
-    const template = state.smsTemplates.find(t => t.id === templateId);
-    if (!template) return;
-
-    const buildings = state.buildings.filter(b => buildingIds.includes(b.id));
-    
-    buildings.forEach(building => {
-      if (building.contactInfo) {
-        // Clean phone number (remove spaces, dashes, etc.)
-        const phoneNumber = building.contactInfo.replace(/\D/g, '');
-        
-        // Create WhatsApp URL
-        const whatsappUrl = `https://wa.me/90${phoneNumber}?text=${encodeURIComponent(template.content)}`;
-        
-        // Open WhatsApp in new tab
-        window.open(whatsappUrl, '_blank');
-      }
-    });
-    
-    addUpdate(
-      'WhatsApp Mesajları Gönderildi', 
-      `${buildings.length} binaya "${template.name}" şablonu ile WhatsApp mesajı gönderildi`
-    );
-  };
-
-  const addProposal = (proposal: Omit<Proposal, 'id' | 'createdDate' | 'createdBy'>) => {
-    if (!state.currentUser) return;
-
-    const newProposal = {
-      ...proposal,
-      id: uuidv4(),
-      createdDate: new Date().toISOString(),
-      createdBy: state.currentUser.name,
-    };
-
-    setState(prev => ({
-      ...prev,
-      proposals: [...prev.proposals, newProposal],
-    }));
-
-    addUpdate('Teklif Oluşturuldu', `${newProposal.title} teklifi oluşturuldu`);
-  };
-
-  const updateProposal = (proposal: Proposal) => {
-    setState(prev => ({
-      ...prev,
-      proposals: prev.proposals.map(p => 
-        p.id === proposal.id ? proposal : p
-      ),
-    }));
-
-    addUpdate('Teklif Güncellendi', `${proposal.title} teklifi güncellendi`);
-  };
-
-  const deleteProposal = (id: string) => {
-    const proposal = state.proposals.find(p => p.id === id);
-    if (!proposal) return;
-
-    setState(prev => ({
-      ...prev,
-      proposals: prev.proposals.filter(p => p.id !== id),
-    }));
-
-    addUpdate('Teklif Silindi', `${proposal.title} teklifi silindi`);
-  };
-
-  const addProposalTemplate = (template: Omit<ProposalTemplate, 'id'>) => {
-    const newTemplate = {
-      ...template,
-      id: uuidv4(),
-    };
-
-    setState(prev => ({
-      ...prev,
-      proposalTemplates: [...prev.proposalTemplates, newTemplate],
-    }));
-
-    addUpdate('Teklif Şablonu Eklendi', `${newTemplate.name} şablonu eklendi`);
-  };
-
-  const updateProposalTemplate = (template: ProposalTemplate) => {
-    setState(prev => ({
-      ...prev,
-      proposalTemplates: prev.proposalTemplates.map(t => 
-        t.id === template.id ? template : t
-      ),
-    }));
-
-    addUpdate('Teklif Şablonu Güncellendi', `${template.name} şablonu güncellendi`);
-  };
-
-  const deleteProposalTemplate = (id: string) => {
-    const template = state.proposalTemplates.find(t => t.id === id);
-    if (!template) return;
-
-    setState(prev => ({
-      ...prev,
-      proposalTemplates: prev.proposalTemplates.filter(t => t.id !== id),
-    }));
-
-    addUpdate('Teklif Şablonu Silindi', `${template.name} şablonu silindi`);
+  const toggleMaintenance = (buildingId: string, showReceipt: boolean = false) => {
+    dispatch({ type: 'TOGGLE_MAINTENANCE', payload: { buildingId, showReceipt } });
   };
 
   const reportFault = (buildingId: string, faultData: { description: string; severity: 'low' | 'medium' | 'high'; reportedBy: string }) => {
-    const building = state.buildings.find(b => b.id === buildingId);
-    if (!building) return;
+    dispatch({ type: 'REPORT_FAULT', payload: { buildingId, faultData } });
+  };
 
-    const now = new Date().toISOString();
+  const updateSettings = (settings: Partial<AppState['settings']>) => {
+    dispatch({ type: 'UPDATE_SETTINGS', payload: settings });
+  };
 
-    setState(prev => ({
-      ...prev,
-      buildings: prev.buildings.map(b => 
-        b.id === buildingId 
-          ? { 
-              ...b, 
-              isDefective: true,
-              defectiveNote: faultData.description,
-              faultSeverity: faultData.severity,
-              faultTimestamp: now,
-              faultReportedBy: faultData.reportedBy
-            } 
-          : b
-      ),
-      notifications: [
-        `${building.name} binasında ${faultData.severity === 'high' ? 'yüksek' : faultData.severity === 'medium' ? 'orta' : 'düşük'} öncelikli arıza bildirimi`,
-        ...prev.notifications
-      ],
-      unreadNotifications: prev.unreadNotifications + 1
-    }));
+  const resetMaintenanceStatus = () => {
+    dispatch({ type: 'RESET_MAINTENANCE_STATUS' });
+  };
 
-    addUpdate(
-      'Arıza Bildirimi', 
-      `${building.name} binasında arıza bildirimi - ${faultData.reportedBy} tarafından bildirildi`
-    );
+  const addFaultReport = (buildingId: string, reporterName: string, reporterSurname: string, reporterPhone: string, apartmentNo: string, description: string) => {
+    dispatch({ 
+      type: 'ADD_FAULT_REPORT', 
+      payload: { 
+        buildingId, 
+        reporterName, 
+        reporterSurname, 
+        reporterPhone, 
+        apartmentNo, 
+        description 
+      } 
+    });
+  };
+
+  const resolveFaultReport = (id: string) => {
+    dispatch({ type: 'RESOLVE_FAULT_REPORT', payload: id });
+  };
+
+  const addMaintenanceHistory = (history: Omit<MaintenanceHistory, 'id'>) => {
+    dispatch({ type: 'ADD_MAINTENANCE_HISTORY', payload: history });
+  };
+
+  const addMaintenanceRecord = (record: Omit<MaintenanceRecord, 'id'>) => {
+    dispatch({ type: 'ADD_MAINTENANCE_RECORD', payload: record });
+  };
+
+  const addPrinter = (printer: Omit<Printer, 'id'>) => {
+    dispatch({ type: 'ADD_PRINTER', payload: printer });
+  };
+
+  const updatePrinter = (printer: Printer) => {
+    dispatch({ type: 'UPDATE_PRINTER', payload: printer });
+  };
+
+  const deletePrinter = (id: string) => {
+    dispatch({ type: 'DELETE_PRINTER', payload: id });
+  };
+
+  const addSMSTemplate = (template: Omit<SMSTemplate, 'id'>) => {
+    dispatch({ type: 'ADD_SMS_TEMPLATE', payload: template });
+  };
+
+  const updateSMSTemplate = (template: SMSTemplate) => {
+    dispatch({ type: 'UPDATE_SMS_TEMPLATE', payload: template });
+  };
+
+  const deleteSMSTemplate = (id: string) => {
+    dispatch({ type: 'DELETE_SMS_TEMPLATE', payload: id });
+  };
+
+  const sendBulkSMS = (templateId: string, buildingIds: string[]) => {
+    dispatch({ type: 'SEND_BULK_SMS', payload: { templateId, buildingIds } });
+  };
+
+  const sendWhatsApp = (templateId: string, buildingIds: string[]) => {
+    dispatch({ type: 'SEND_WHATSAPP', payload: { templateId, buildingIds } });
+  };
+
+  const addProposal = (proposal: Omit<Proposal, 'id' | 'createdDate' | 'createdBy'>) => {
+    dispatch({ type: 'ADD_PROPOSAL', payload: proposal });
+  };
+
+  const updateProposal = (proposal: Proposal) => {
+    dispatch({ type: 'UPDATE_PROPOSAL', payload: proposal });
+  };
+
+  const deleteProposal = (id: string) => {
+    dispatch({ type: 'DELETE_PROPOSAL', payload: id });
+  };
+
+  const addPayment = (payment: Omit<Payment, 'id'>) => {
+    dispatch({ type: 'ADD_PAYMENT', payload: payment });
+  };
+
+  const addProposalTemplate = (template: Omit<ProposalTemplate, 'id'>) => {
+    dispatch({ type: 'ADD_PROPOSAL_TEMPLATE', payload: template });
+  };
+
+  const updateProposalTemplate = (template: ProposalTemplate) => {
+    dispatch({ type: 'UPDATE_PROPOSAL_TEMPLATE', payload: template });
+  };
+
+  const deleteProposalTemplate = (id: string) => {
+    dispatch({ type: 'DELETE_PROPOSAL_TEMPLATE', payload: id });
+  };
+
+  const addQRCodeData = (qrData: Omit<QRCodeData, 'id'>) => {
+    dispatch({ type: 'ADD_QR_CODE_DATA', payload: qrData });
   };
 
   const updateAutoSaveData = (data: AutoSaveData) => {
-    setState(prev => ({
-      ...prev,
-      autoSaveData: [data, ...prev.autoSaveData.filter(d => d.formType !== data.formType || d.userId !== data.userId)],
-      lastAutoSave: data.timestamp
-    }));
+    dispatch({ type: 'UPDATE_AUTO_SAVE_DATA', payload: data });
   };
 
-  const addQRCodeData = (qrCodeData: any) => {
-    setState(prev => ({
-      ...prev,
-      qrCodes: [...prev.qrCodes, qrCodeData]
-    }));
-    
-    addUpdate('QR Kod Oluşturuldu', `${qrCodeData.buildingId} için QR kod oluşturuldu`);
-  };
+  const showReceiptModal = (htmlContent: string) => {
+    // Process emblem placeholders before showing modal
+    let processedHtml = htmlContent;
 
-  const showPrinterSelection = (htmlContent: string) => {
-    // For now, just print directly using browser's print dialog
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
-      printWindow.focus();
-      printWindow.print();
-      printWindow.close();
+    // CE Emblem replacement
+    if (state.settings.ceEmblemUrl) {
+      processedHtml = processedHtml.replace(
+        /{{CE_EMBLEM}}/g,
+        `<img src="${state.settings.ceEmblemUrl}" alt="CE Amblemi" style="max-height: 40px; object-fit: contain; display: inline-block; vertical-align: middle;">`
+      );
+    } else {
+      processedHtml = processedHtml.replace(/{{CE_EMBLEM}}/g, '');
     }
+
+    // TSE Emblem replacement
+    if (state.settings.tseEmblemUrl) {
+      processedHtml = processedHtml.replace(
+        /{{TSE_EMBLEM}}/g,
+        `<img src="${state.settings.tseEmblemUrl}" alt="TSE Amblemi" style="max-height: 40px; object-fit: contain; display: inline-block; vertical-align: middle;">`
+      );
+    } else {
+      processedHtml = processedHtml.replace(/{{TSE_EMBLEM}}/g, '');
+    }
+
+    // Logo replacement
+    if (state.settings.logo) {
+      processedHtml = processedHtml.replace(
+        /{{LOGO}}/g,
+        `<img src="${state.settings.logo}" alt="Company Logo" class="logo" style="max-height: 60px; max-width: 150px;">`
+      );
+    } else {
+      processedHtml = processedHtml.replace(/{{LOGO}}/g, '');
+    }
+
+    // Company name replacement
+    if (state.settings.companyName) {
+      processedHtml = processedHtml.replace(/{{COMPANY_NAME}}/g, state.settings.companyName);
+    }
+
+    dispatch({ type: 'SHOW_RECEIPT_MODAL', payload: processedHtml });
   };
+
+  const closeReceiptModal = () => {
+    dispatch({ type: 'CLOSE_RECEIPT_MODAL' });
+  };
+
+  const archiveReceipt = (receipt: Omit<ArchivedReceipt, 'id'>) => {
+    dispatch({ type: 'ARCHIVE_RECEIPT', payload: receipt });
+  };
+
+  const showPrinterSelection = (content: string) => {
+    dispatch({ type: 'SHOW_PRINTER_SELECTION', payload: content });
+  };
+
+  const closePrinterSelection = () => {
+    dispatch({ type: 'CLOSE_PRINTER_SELECTION' });
+  };
+
+  const increasePrices = (percentage: number) => {
+    dispatch({ type: 'INCREASE_PRICES', payload: percentage });
+  };
+
   return (
-    <AppContext.Provider value={{ 
-      state, 
-      setUser,
-      deleteUser,
-      addBuilding, 
-      updateBuilding, 
-      deleteBuilding,
-      toggleMaintenance,
-      addPart,
-      updatePart,
-      deletePart,
-      increasePrices,
-      installPart,
-      installManualPart,
-      markPartAsPaid,
-      payDebt,
-      toggleSidebar,
-      updateSettings,
-      addFaultReport,
-      resolveFaultReport,
-      printMaintenanceReceipt,
-      addPrinter,
-      updatePrinter,
-      deletePrinter,
-      clearNotifications,
-      addSMSTemplate,
-      updateSMSTemplate,
-      deleteSMSTemplate,
-      sendBulkSMS,
-      sendWhatsApp,
-      addProposal,
-      updateProposal,
-      deleteProposal,
-      addPayment,
-      addProposalTemplate,
-      updateProposalTemplate,
-      deleteProposalTemplate,
-      reportFault,
-      updateAutoSaveData,
-      openReceiptModal,
-      closeReceiptModal,
-      addQRCodeData,
-      showPrinterSelection
-    }}>
+    <AppContext.Provider
+      value={{
+        state,
+        addBuilding,
+        updateBuilding,
+        deleteBuilding,
+        addPart,
+        updatePart,
+        deletePart,
+        installPart,
+        installManualPart,
+        markPartAsPaid,
+        addUpdate,
+        addIncome,
+        setUser,
+        deleteUser,
+        addNotification,
+        clearNotifications,
+        toggleSidebar,
+        toggleMaintenance,
+        reportFault,
+        updateSettings,
+        resetMaintenanceStatus,
+        addFaultReport,
+        resolveFaultReport,
+        addMaintenanceHistory,
+        addMaintenanceRecord,
+        addPrinter,
+        updatePrinter,
+        deletePrinter,
+        addSMSTemplate,
+        updateSMSTemplate,
+        deleteSMSTemplate,
+        sendBulkSMS,
+        sendWhatsApp,
+        addProposal,
+        updateProposal,
+        deleteProposal,
+        addPayment,
+        addProposalTemplate,
+        updateProposalTemplate,
+        deleteProposalTemplate,
+        addQRCodeData,
+        updateAutoSaveData,
+        showReceiptModal,
+        closeReceiptModal,
+        archiveReceipt,
+        showPrinterSelection,
+        closePrinterSelection,
+        increasePrices,
+      }}
+    >
       {children}
     </AppContext.Provider>
   );
