@@ -397,6 +397,7 @@ interface AppContextProps {
   openReceiptModal: (html: string) => void;
   closeReceiptModal: () => void;
   addQRCodeData: (qrCodeData: any) => void;
+  showPrinterSelection: (htmlContent: string) => void;
 }
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
@@ -1571,6 +1572,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addUpdate('QR Kod Oluşturuldu', `${qrCodeData.buildingId} için QR kod oluşturuldu`);
   };
 
+  const showPrinterSelection = (htmlContent: string) => {
+    // For now, just print directly using browser's print dialog
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+      printWindow.close();
+    }
+  };
   return (
     <AppContext.Provider value={{ 
       state, 
@@ -1613,7 +1625,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateAutoSaveData,
       openReceiptModal,
       closeReceiptModal,
-      addQRCodeData
+      addQRCodeData,
+      showPrinterSelection
     }}>
       {children}
     </AppContext.Provider>
