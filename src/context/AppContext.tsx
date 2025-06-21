@@ -28,207 +28,259 @@ const initialState: AppState = {
     ceEmblemUrl: '/ce.png',
     tseEmblemUrl: '/ts.jpg',
     receiptTemplate: `
-      <div class="receipt">
-        <div class="header">
-          <div class="logo-section">
+      <div class="receipt-container">
+        <div class="header-section">
+          <div class="header-left">
             {{LOGO}}
           </div>
-          <div class="company-details">
-            <div class="company-name">{{COMPANY_NAME}}</div>
-            <div class="certifications">
-              {{CE_EMBLEM}}
-              {{TSE_EMBLEM}}
+          <div class="header-center">
+            <h1 class="company-name-title">{{COMPANY_NAME}}</h1>
+            <div class="company-contact">
+              <p>Adres: {{COMPANY_ADDRESS}}</p>
+              <p>Tel: {{COMPANY_PHONE}}</p>
             </div>
           </div>
-          <div class="address-info">
-            <div class="address-text">{{COMPANY_ADDRESS}}</div>
-            <div class="phone-text">Tel: {{COMPANY_PHONE}}</div>
+          <div class="header-right">
+            {{CE_EMBLEM}}
+            {{TSE_EMBLEM}}
           </div>
         </div>
-        
-        <div class="receipt-title">
-          <h1>BAKIM FİŞİ</h1>
+
+        <div class="receipt-title-section">
+          <h2>BAKIM FİŞİ</h2>
         </div>
-        
-        <div class="building-info">
-          <h2>{{BUILDING_NAME}}</h2>
-          <p>{{BUILDING_ADDRESS}}</p>
+
+        <div class="building-details-section">
+          <h3>Bina Adı: {{BUILDING_NAME}}</h3>
+          <p>Bakım Tarihi: {{DATE}}</p>
         </div>
-        
-        <div class="maintenance-details">
-          <div class="detail-row">
-            <span class="label">Tarih:</span>
-            <span class="value">{{DATE}}</span>
+
+        <div class="maintenance-summary-section">
+          <div class="summary-item">
+            <span>Yapılan İşlem:</span>
+            <span>Rutin Bakım</span>
           </div>
-          <div class="detail-row">
-            <span class="label">Asansör Sayısı:</span>
-            <span class="value">{{ELEVATOR_COUNT}}</span>
+          <div class="summary-item">
+            <span>Bakım Ücreti:</span>
+            <span>{{MAINTENANCE_FEE_CALCULATED}}</span>
           </div>
-          <div class="detail-row">
-            <span class="label">Yapılan İşlem:</span>
-            <span class="value">{{MAINTENANCE_ACTION}}</span>
-          </div>
-          <div class="detail-row">
-            <span class="label">Teknisyen:</span>
-            <span class="value">{{TECHNICIAN}}</span>
+          <div class="summary-item">
+            <span>Teknisyen:</span>
+            <span>{{TECHNICIAN_NAME}}</span>
           </div>
         </div>
-        
+
         {{PARTS_SECTION}}
         {{DEBT_SECTION}}
-        
-        <div class="total-section">
-          <div class="total-row">
-            <span class="total-label">Toplam Tutar:</span>
-            <span class="total-value">{{TOTAL_AMOUNT}} ₺</span>
-          </div>
+
+        <div class="total-amount-section">
+          <span>Toplam Tutar:</span>
+          <span class="final-total">{{FINAL_TOTAL_AMOUNT}}</span>
         </div>
-        
-        <div class="footer">
-          <p>Bu fiş {{TIMESTAMP}} tarihinde oluşturulmuştur.</p>
-          <p>Teşekkür ederiz.</p>
+
+        <div class="footer-section">
+          <p>Bu fiş, güvenliğiniz ve konforunuz için yapılan bakımın belgesidir. <br> İlginiz için teşekkür ederiz.</p>
         </div>
+
+        <div class="watermark" style="background-image: url('{{LOGO_WATERMARK_URL}}');"></div>
       </div>
-      
+
       <style>
-        .receipt {
+        .receipt-container {
+          position: relative;
           max-width: 800px;
           margin: 0 auto;
-          background: white;
-          font-family: Arial, sans-serif;
-          line-height: 1.4;
-        }
-        .header {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          padding: 20px;
-          background: #f8f9fa;
-          border-bottom: 2px solid #333;
-        }
-        .logo-section {
-          flex: 1;
-        }
-        .logo {
-          max-height: 60px;
-          max-width: 150px;
-        }
-        .company-details {
-          flex: 2;
-          text-align: center;
-        }
-        .company-name {
-          font-size: 24px;
-          font-weight: bold;
+          padding: 30px;
+          border: 1px solid #eee;
+          box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
           color: #333;
-          margin: 10px 0;
+          line-height: 1.6;
+          background-color: #fff;
+          overflow: hidden; /* Filigranın taşmasını önlemek için */
         }
-        .certifications {
-          display: flex;
-          justify-content: center;
-          gap: 15px;
-          margin-top: 10px;
+        .watermark {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 80%; /* Filigranın boyutunu ayarlayın */
+          height: 80%; /* Filigranın boyutunu ayarlayın */
+          background-repeat: no-repeat;
+          background-position: center;
+          background-size: contain;
+          opacity: 0.05; /* Filigranın şeffaflığını ayarlayın */
+          z-index: 0; /* İçeriğin arkasında kalmasını sağlayın */
+          pointer-events: none; /* Üzerine tıklamayı engeller */
         }
-        .certifications img {
-          max-height: 40px;
-          object-fit: contain;
-        }
-        .address-info {
-          flex: 1;
-          text-align: right;
-          font-size: 12px;
-          color: #666;
-        }
-        .address-text {
-          margin-bottom: 5px;
-          line-height: 1.4;
-        }
-        .phone-text {
-          font-weight: bold;
-        }
-        .receipt-title {
-          text-align: center;
-          padding: 20px;
-          background: #dc2626;
-          color: white;
-        }
-        .receipt-title h1 {
-          margin: 0;
-          font-size: 20px;
-        }
-        .building-info {
-          padding: 20px;
-          background: #f3f4f6;
-          border-bottom: 1px solid #e5e7eb;
-        }
-        .building-info h2 {
-          margin: 0 0 10px 0;
-          color: #333;
-          font-size: 18px;
-        }
-        .building-info p {
-          margin: 0;
-          color: #666;
-        }
-        .maintenance-details {
-          padding: 20px;
-        }
-        .detail-row {
-          display: flex;
-          justify-content: space-between;
-          margin-bottom: 10px;
-          padding: 5px 0;
-          border-bottom: 1px dotted #ccc;
-        }
-        .label {
-          font-weight: bold;
-          color: #333;
-        }
-        .value {
-          color: #666;
-        }
-        .parts-section, .debt-section {
-          margin: 20px;
-          padding: 15px;
-          background: #f9f9f9;
-          border-radius: 5px;
-        }
-        .section-title {
-          font-weight: bold;
-          color: #333;
-          margin-bottom: 10px;
-          font-size: 16px;
-        }
-        .total-section {
-          padding: 20px;
-          background: #f3f4f6;
-          border-top: 2px solid #333;
-        }
-        .total-row {
+        .header-section {
           display: flex;
           justify-content: space-between;
           align-items: center;
+          margin-bottom: 30px;
+          border-bottom: 2px solid #ccc;
+          padding-bottom: 15px;
+          position: relative;
+          z-index: 1;
         }
-        .total-label {
+        .header-left .logo {
+          max-height: 80px;
+          max-width: 180px;
+          object-fit: contain;
+        }
+        .header-center {
+          text-align: center;
+          flex-grow: 1;
+        }
+        .company-name-title {
+          font-size: 28px;
+          color: #dc2626;
+          margin: 0 0 5px 0;
+          font-weight: bold;
+        }
+        .company-contact {
+          font-size: 13px;
+          color: #555;
+        }
+        .company-contact p {
+          margin: 0;
+        }
+        .header-right {
+          display: flex;
+          gap: 15px;
+        }
+        .header-right img {
+          max-height: 50px;
+          object-fit: contain;
+        }
+        .receipt-title-section {
+          text-align: center;
+          background-color: #dc2626;
+          color: white;
+          padding: 10px 0;
+          margin-bottom: 25px;
+          position: relative;
+          z-index: 1;
+        }
+        .receipt-title-section h2 {
+          margin: 0;
+          font-size: 22px;
+          text-transform: uppercase;
+        }
+        .building-details-section {
+          background-color: #f8f8f8;
+          padding: 15px 20px;
+          margin-bottom: 20px;
+          border-left: 5px solid #dc2626;
+          position: relative;
+          z-index: 1;
+        }
+        .building-details-section h3 {
+          margin: 0 0 8px 0;
+          color: #333;
+          font-size: 19px;
+        }
+        .building-details-section p {
+          margin: 0;
+          color: #666;
+        }
+        .maintenance-summary-section {
+          margin-bottom: 20px;
+          border: 1px solid #eee;
+          padding: 15px;
+          border-radius: 5px;
+          position: relative;
+          z-index: 1;
+        }
+        .summary-item {
+          display: flex;
+          justify-content: space-between;
+          padding: 5px 0;
+          border-bottom: 1px dotted #e0e0e0;
+        }
+        .summary-item:last-child {
+          border-bottom: none;
+        }
+        .summary-item span:first-child {
+          font-weight: bold;
+          color: #444;
+        }
+        .parts-section, .debt-section {
+          margin-top: 25px;
+          margin-bottom: 25px;
+          border: 1px solid #eee;
+          padding: 15px;
+          border-radius: 5px;
+          background-color: #fdfdfd;
+          position: relative;
+          z-index: 1;
+        }
+        .section-title {
           font-size: 18px;
           font-weight: bold;
-          color: #333;
+          color: #dc2626;
+          margin-bottom: 10px;
+          padding-bottom: 5px;
+          border-bottom: 1px solid #f0f0f0;
         }
-        .total-value {
+        .parts-list, .debt-list {
+          list-style-type: none;
+          padding: 0;
+          margin: 0;
+        }
+        .parts-list li, .debt-list li {
+          padding: 5px 0;
+          border-bottom: 1px dotted #e9e9e9;
+          font-size: 14px;
+        }
+        .parts-list li:last-child, .debt-list li:last-child {
+          border-bottom: none;
+        }
+        .total-amount-section {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          background-color: #f3f4f6;
+          padding: 15px 20px;
+          border-top: 2px solid #dc2626;
+          margin-top: 30px;
           font-size: 20px;
           font-weight: bold;
-          color: #dc2626;
+          color: #333;
+          position: relative;
+          z-index: 1;
         }
-        .footer {
-          padding: 20px;
+        .final-total {
+          color: #dc2626;
+          font-size: 24px;
+        }
+        .footer-section {
           text-align: center;
-          font-size: 12px;
-          color: #666;
-          border-top: 1px solid #e5e7eb;
+          margin-top: 30px;
+          padding-top: 15px;
+          border-top: 1px solid #eee;
+          font-size: 13px;
+          color: #777;
+          position: relative;
+          z-index: 1;
+        }
+        .footer-section p {
+          margin: 0;
         }
         @media print {
-          .receipt {
+          .receipt-container {
             box-shadow: none;
+            border: none;
+            padding: 0;
+          }
+          .header-section, .receipt-title-section, .building-details-section,
+          .maintenance-summary-section, .parts-section, .debt-section,
+          .total-amount-section, .footer-section {
+            box-shadow: none;
+            page-break-inside: avoid;
+          }
+          .watermark {
+            opacity: 0.1; /* Yazdırma için daha belirgin olabilir */
           }
         }
       </style>
@@ -432,21 +484,21 @@ function appReducer(state: AppState, action: Action): AppState {
 
       const totalPartCost = part.price * action.payload.quantity;
 
-      // Update part quantity
+      // Parça miktarını güncelle
       const updatedParts = state.parts.map(p =>
         p.id === action.payload.partId
           ? { ...p, quantity: p.quantity - action.payload.quantity }
           : p
       );
 
-      // Update building debt
+      // Bina borcunu güncelle
       const updatedBuildings = state.buildings.map(b =>
         b.id === action.payload.buildingId
           ? { ...b, debt: b.debt + totalPartCost }
           : b
       );
 
-      // Add debt record
+      // Borç kaydı ekle
       const debtRecord: DebtRecord = {
         id: uuidv4(),
         buildingId: action.payload.buildingId,
@@ -487,14 +539,14 @@ function appReducer(state: AppState, action: Action): AppState {
 
       const manualBuilding = state.buildings.find(b => b.id === action.payload.buildingId);
 
-      // Update building debt
+      // Bina borcunu güncelle
       const updatedBuildingsManual = state.buildings.map(b =>
         b.id === action.payload.buildingId
           ? { ...b, debt: b.debt + action.payload.totalPrice }
           : b
       );
 
-      // Add debt record
+      // Borç kaydı ekle
       const manualDebtRecord: DebtRecord = {
         id: uuidv4(),
         buildingId: action.payload.buildingId,
