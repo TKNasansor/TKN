@@ -24,7 +24,7 @@ const initialSettings: AppSettings = {
           </div>
           <div class="company-details">
             <div class="company-name">{{COMPANY_NAME}}</div>
-            <div class="certifications">CE Belgesi | ISO 9001:2015</div>
+            <div class="certifications">{{CE_EMBLEM}} | {{TSE_EMBLEM}}</div>
           </div>
         </div>
         <div class="address-info">
