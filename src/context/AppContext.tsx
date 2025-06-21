@@ -623,8 +623,8 @@ function appReducer(state: AppState, action: Action): AppState {
       if (!targetBuilding) return state;
 
       const newMaintenanceStatus = !targetBuilding.isMaintained;
-      const currentDate = new Date().toISOString().split('T')[0];
-      const currentTime = new Date().toLocaleTimeString('tr-TR', { 
+      const currentDateISO = new Date().toISOString().split('T')[0];
+      const currentTimeLocale = new Date().toLocaleTimeString('tr-TR', { 
         hour: '2-digit', 
         minute: '2-digit' 
       });
@@ -634,9 +634,9 @@ function appReducer(state: AppState, action: Action): AppState {
           ? {
               ...b,
               isMaintained: newMaintenanceStatus,
-              lastMaintenanceDate: newMaintenanceStatus ? currentDate : b.lastMaintenanceDate,
-              lastMaintenanceTime: newMaintenanceStatus ? currentTime : b.lastMaintenanceTime,
-              isDefective: false, // Clear defective status when maintenance is done
+              lastMaintenanceDate: newMaintenanceStatus ? currentDateISO : b.lastMaintenanceDate,
+              lastMaintenanceTime: newMaintenanceStatus ? currentTimeLocale : b.lastMaintenanceTime,
+              isDefective: false, // Bakım yapıldığında arıza durumunu temizle
               defectiveNote: undefined,
               faultSeverity: undefined,
               faultTimestamp: undefined,
@@ -652,18 +652,18 @@ function appReducer(state: AppState, action: Action): AppState {
       if (newMaintenanceStatus) {
         const maintenanceFee = targetBuilding.maintenanceFee * targetBuilding.elevatorCount;
         
-        // Update building debt
+        // Bina borcunu güncelle
         updatedBuildingsForMaintenance = updatedBuildingsForMaintenance.map(b =>
           b.id === buildingId
             ? { ...b, debt: b.debt + maintenanceFee }
             : b
         );
 
-        // Add debt record
+        // Borç kaydı ekle
         const maintenanceDebtRecord: DebtRecord = {
           id: uuidv4(),
           buildingId,
-          date: currentDate,
+          date: currentDateISO,
           type: 'maintenance',
           description: `Bakım ücreti (${targetBuilding.elevatorCount} asansör)`,
           amount: maintenanceFee,
@@ -674,25 +674,25 @@ function appReducer(state: AppState, action: Action): AppState {
 
         newDebtRecords = [...newDebtRecords, maintenanceDebtRecord];
 
-        // Add maintenance history
+        // Bakım geçmişi ekle
         const maintenanceHistoryRecord: MaintenanceHistory = {
           id: uuidv4(),
           buildingId,
-          maintenanceDate: currentDate,
-          maintenanceTime: currentTime,
+          maintenanceDate: currentDateISO,
+          maintenanceTime: currentTimeLocale,
           performedBy: state.currentUser?.name || 'Bilinmeyen',
           maintenanceFee,
         };
 
         newMaintenanceHistory = [...newMaintenanceHistory, maintenanceHistoryRecord];
 
-        // Add maintenance record
+        // Bakım kaydı ekle
         const maintenanceRecord: MaintenanceRecord = {
           id: uuidv4(),
           buildingId,
           performedBy: state.currentUser?.name || 'Bilinmeyen',
-          maintenanceDate: currentDate,
-          maintenanceTime: currentTime,
+          maintenanceDate: currentDateISO,
+          maintenanceTime: currentTimeLocale,
           elevatorCount: targetBuilding.elevatorCount,
           totalFee: maintenanceFee,
           status: 'completed',
@@ -721,9 +721,9 @@ function appReducer(state: AppState, action: Action): AppState {
         ],
       };
 
-      // Show receipt modal if requested and maintenance was completed
+      // Makbuz modülünü göster ve bakım tamamlandıysa fişi oluştur
       if (showReceipt && newMaintenanceStatus) {
-        const receiptHtml = generateMaintenanceReceipt(targetBuilding, newState.settings, state.currentUser?.name || 'Bilinmeyen');
+        const receiptHtml = generateMaintenanceReceipt(targetBuilding, newState, state.currentUser?.name || 'Bilinmeyen');
         return {
           ...newState,
           showReceiptModal: true,
@@ -859,7 +859,7 @@ function appReducer(state: AppState, action: Action): AppState {
         id: uuidv4(),
       };
 
-      // If this is set as default, remove default from others
+      // Eğer bu varsayılan olarak ayarlandıysa, diğerlerinden varsayılanı kaldır
       let updatedPrinters = state.printers;
       if (newPrinter.isDefault) {
         updatedPrinters = state.printers.map(p => ({ ...p, isDefault: false }));
@@ -873,7 +873,7 @@ function appReducer(state: AppState, action: Action): AppState {
     case 'UPDATE_PRINTER':
       let printersForUpdate = state.printers;
       
-      // If this printer is being set as default, remove default from others
+      // Eğer bu yazıcı varsayılan olarak ayarlanıyorsa, diğerlerinden varsayılanı kaldır
       if (action.payload.isDefault) {
         printersForUpdate = state.printers.map(p => 
           p.id === action.payload.id ? p : { ...p, isDefault: false }
@@ -919,7 +919,7 @@ function appReducer(state: AppState, action: Action): AppState {
       };
 
     case 'SEND_BULK_SMS':
-      // In a real implementation, this would trigger SMS sending
+      // Gerçek bir uygulamada, bu SMS göndermeyi tetikler
       console.log('Sending SMS to buildings:', action.payload.buildingIds);
       return state;
 
@@ -974,17 +974,17 @@ function appReducer(state: AppState, action: Action): AppState {
         id: uuidv4(),
       };
 
-      // Update building debt
+      // Bina borcunu güncelle
       const updatedBuildingsForPayment = state.buildings.map(b =>
         b.id === action.payload.buildingId
           ? { ...b, debt: Math.max(0, b.debt - action.payload.amount) }
           : b
       );
 
-      // Find the building for debt record
+      // Borç kaydı için binayı bul
       const paymentBuilding = state.buildings.find(b => b.id === action.payload.buildingId);
 
-      // Add debt record for payment
+      // Ödeme için borç kaydı ekle
       const paymentDebtRecord: DebtRecord = {
         id: uuidv4(),
         buildingId: action.payload.buildingId,
@@ -1077,6 +1077,8 @@ function appReducer(state: AppState, action: Action): AppState {
       };
 
     case 'SHOW_RECEIPT_MODAL':
+      // generateMaintenanceReceipt fonksiyonu zaten tüm yer tutucuları dolduruyor.
+      // Burada sadece modalı gösterme ve içeriğini atama işlemi kalıyor.
       return {
         ...state,
         showReceiptModal: true,
@@ -1142,128 +1144,119 @@ function appReducer(state: AppState, action: Action): AppState {
   }
 }
 
-// Helper function to generate maintenance receipt HTML
-function generateMaintenanceReceipt(building: Building, settings: AppState['settings'], technician: string): string {
+// Bakım fişi HTML'ini oluşturan yardımcı fonksiyon
+function generateMaintenanceReceipt(building: Building, state: AppState, technician: string): string {
+  // Bakım tarihi ve saati
   const currentDate = new Date().toLocaleDateString('tr-TR');
   const currentTime = new Date().toLocaleTimeString('tr-TR', { 
     hour: '2-digit', 
     minute: '2-digit' 
   });
-  const maintenanceFee = building.maintenanceFee * building.elevatorCount;
   
-  const buildingAddress = building.address ? 
-    `${building.address.mahalle} ${building.address.sokak} ${building.address.binaNo}, ${building.address.ilce}/${building.address.il}` : 
+  // Bakım ücreti hesaplama
+  const maintenanceFee = building.maintenanceFee * building.elevatorCount;
+
+  // Şirket adresini formatlama
+  const companyAddressFormatted = state.settings.companyAddress ?
+    `${state.settings.companyAddress.mahalle} ${state.settings.companyAddress.sokak} No:${state.settings.companyAddress.binaNo}, ${state.settings.companyAddress.ilce}/${state.settings.companyAddress.il}` :
     'Adres belirtilmemiş';
 
-  const companyAddress = settings.companyAddress ? 
-    `${settings.companyAddress.mahalle} ${settings.companyAddress.sokak} ${settings.companyAddress.binaNo}, ${settings.companyAddress.ilce}/${settings.companyAddress.il}` : 
+  // Bina adresini formatlama
+  const buildingAddressFormatted = building.address ?
+    `${building.address.mahalle} ${building.address.sokak} No:${building.address.binaNo}, ${building.address.ilce}/${building.address.il}` :
     'Adres belirtilmemiş';
 
-  let htmlContent = settings.receiptTemplate || `
-    <div class="receipt">
-      <div class="header">
-        <div class="logo-section">
-          {{LOGO}}
-        </div>
-        <div class="company-details">
-          <div class="company-name">{{COMPANY_NAME}}</div>
-          <div class="certifications">
-            {{CE_EMBLEM}}
-            {{TSE_EMBLEM}}
-          </div>
-        </div>
-        <div class="address-info">
-          <div class="address-text">{{COMPANY_ADDRESS}}</div>
-          <div class="phone-text">Tel: {{COMPANY_PHONE}}</div>
-        </div>
-      </div>
-      
-      <div class="receipt-title">
-        <h1>BAKIM FİŞİ</h1>
-      </div>
-      
-      <div class="building-info">
-        <h2>{{BUILDING_NAME}}</h2>
-        <p>{{BUILDING_ADDRESS}}</p>
-      </div>
-      
-      <div class="maintenance-details">
-        <div class="detail-row">
-          <span class="label">Tarih:</span>
-          <span class="value">{{DATE}}</span>
-        </div>
-        <div class="detail-row">
-          <span class="label">Asansör Sayısı:</span>
-          <span class="value">{{ELEVATOR_COUNT}}</span>
-        </div>
-        <div class="detail-row">
-          <span class="label">Yapılan İşlem:</span>
-          <span class="value">{{MAINTENANCE_ACTION}}</span>
-        </div>
-        <div class="detail-row">
-          <span class="label">Teknisyen:</span>
-          <span class="value">{{TECHNICIAN}}</span>
-        </div>
-      </div>
-      
-      {{PARTS_SECTION}}
-      {{DEBT_SECTION}}
-      
-      <div class="total-section">
-        <div class="total-row">
-          <span class="total-label">Toplam Tutar:</span>
-          <span class="total-value">{{TOTAL_AMOUNT}} ₺</span>
-        </div>
-      </div>
-      
-      <div class="footer">
-        <p>Bu fiş {{TIMESTAMP}} tarihinde oluşturulmuştur.</p>
-        <p>Teşekkür ederiz.</p>
-      </div>
-    </div>
-  `;
+  // Takılan Parçaları Oluşturma
+  // Mevcut binaya ait ve henüz ödenmemiş parça kurulumlarını filtrele
+  const installedParts = [
+    ...state.partInstallations.filter(pi => pi.buildingId === building.id && !pi.isPaid),
+    ...state.manualPartInstallations.filter(mpi => mpi.buildingId === building.id && !mpi.isPaid)
+  ];
 
-  // Process emblem placeholders first
-  if (settings.ceEmblemUrl) {
-    htmlContent = htmlContent.replace(
-      /{{CE_EMBLEM}}/g,
-      `<img src="${settings.ceEmblemUrl}" alt="CE Amblemi" style="max-height: 40px; object-fit: contain; display: inline-block; vertical-align: middle;">`
-    );
-  } else {
-    htmlContent = htmlContent.replace(/{{CE_EMBLEM}}/g, '');
+  let partsSectionHtml = '';
+  let totalPartsCost = 0;
+  if (installedParts.length > 0) {
+    let partsListHtml = '<ul class="parts-list">';
+    installedParts.forEach(item => {
+      if ('partId' in item) { // Eğer bir PartInstallation ise
+        const part = state.parts.find(p => p.id === item.partId);
+        if (part) {
+          const cost = part.price * item.quantity;
+          totalPartsCost += cost;
+          partsListHtml += `<li>${item.quantity} Adet ${part.name} - ${cost.toLocaleString('tr-TR')} ₺</li>`;
+        }
+      } else { // Eğer bir ManualPartInstallation ise
+        totalPartsCost += item.totalPrice;
+        partsListHtml += `<li>${item.quantity} Adet ${item.partName} (Manuel) - ${item.totalPrice.toLocaleString('tr-TR')} ₺</li>`;
+      }
+    });
+    partsListHtml += '</ul>';
+
+    partsSectionHtml = `
+      <div class="parts-section">
+        <div class="section-title">Takılan Parçalar</div>
+        ${partsListHtml}
+        <p style="text-align: right; font-weight: bold; margin-top: 10px;">Parça Toplam: ${totalPartsCost.toLocaleString('tr-TR')} ₺</p>
+      </div>
+    `;
   }
 
-  if (settings.tseEmblemUrl) {
-    htmlContent = htmlContent.replace(
-      /{{TSE_EMBLEM}}/g,
-      `<img src="${settings.tseEmblemUrl}" alt="TSE Amblemi" style="max-height: 40px; object-fit: contain; display: inline-block; vertical-align: middle;">`
-    );
-  } else {
-    htmlContent = htmlContent.replace(/{{TSE_EMBLEM}}/g, '');
-  }
+  // Borç Durumunu Oluşturma
+  // Mevcut binaya ait tüm borç kayıtlarını filtrele
+  const buildingDebtRecords = state.debtRecords.filter(dr => dr.buildingId === building.id);
+  let debtSectionHtml = '';
+  if (buildingDebtRecords.length > 0) {
+    let debtListHtml = '<ul class="debt-list">';
+    // Son 5 borç kaydını göster (veya tümünü, ihtiyaca göre ayarlanabilir)
+    const recentDebtRecords = buildingDebtRecords.slice(-5); 
+    recentDebtRecords.forEach(record => {
+      const recordDate = new Date(record.date).toLocaleDateString('tr-TR');
+      let amountDisplay = '';
+      if (record.type === 'maintenance' || record.type === 'part') {
+        amountDisplay = `+${record.amount.toLocaleString('tr-TR')} ₺`;
+      } else if (record.type === 'payment') {
+        amountDisplay = `-${record.amount.toLocaleString('tr-TR')} ₺`;
+      }
+      debtListHtml += `<li>${recordDate}: ${record.description} - ${amountDisplay} (Yeni Borç: ${record.newDebt.toLocaleString('tr-TR')} ₺)</li>`;
+    });
+    debtListHtml += '</ul>';
 
-  // Process other placeholders
-  htmlContent = htmlContent
-    .replace(/{{LOGO}}/g, settings.logo ? `<img src="${settings.logo}" alt="Logo" class="logo">` : '')
-    .replace(/{{COMPANY_NAME}}/g, settings.companyName)
-    .replace(/{{COMPANY_ADDRESS}}/g, companyAddress)
-    .replace(/{{COMPANY_PHONE}}/g, settings.companyPhone)
-    .replace(/{{BUILDING_NAME}}/g, building.name)
-    .replace(/{{BUILDING_ADDRESS}}/g, buildingAddress)
-    .replace(/{{DATE}}/g, `${currentDate} ${currentTime}`)
-    .replace(/{{ELEVATOR_COUNT}}/g, building.elevatorCount.toString())
-    .replace(/{{MAINTENANCE_ACTION}}/g, 'Rutin Bakım')
-    .replace(/{{TECHNICIAN}}/g, technician)
-    .replace(/{{MAINTENANCE_FEE}}/g, `${maintenanceFee.toLocaleString('tr-TR')} ₺`)
-    .replace(/{{PARTS_SECTION}}/g, '')
-    .replace(/{{DEBT_SECTION}}/g, `
+    debtSectionHtml = `
       <div class="debt-section">
-        <div class="section-title">Borç Durumu</div>
-        <p>Yeni borç: ${(building.debt + maintenanceFee).toLocaleString('tr-TR')} ₺</p>
+        <div class="section-title">Borç Hareketleri</div>
+        ${debtListHtml}
+        <p style="text-align: right; font-weight: bold; margin-top: 10px;">Güncel Borç: ${building.debt.toLocaleString('tr-TR')} ₺</p>
       </div>
-    `)
-    .replace(/{{TOTAL_AMOUNT}}/g, maintenanceFee.toLocaleString('tr-TR'))
-    .replace(/{{TIMESTAMP}}/g, new Date().toLocaleString('tr-TR'));
+    `;
+  }
+
+  // Fişin sadece bu bakımla ilgili toplam tutarı (bakım ücreti + takılan parçalar)
+  const finalTotalAmount = maintenanceFee + totalPartsCost; 
+
+  // Şablonu al, yoksa boş string kullan (asıl şablon SettingsPage'den gelmeli)
+  let htmlContent = state.settings.receiptTemplate || '';
+
+  // Filigran logosu için özel yer tutucu eklendi
+  htmlContent = htmlContent.replace(/{{LOGO_WATERMARK_URL}}/g, state.settings.logo || '');
+  
+  // Amblem ve Logo Yer Tutucularını Doldurma
+  htmlContent = htmlContent
+    .replace(/{{CE_EMBLEM}}/g, state.settings.ceEmblemUrl ? `<img src="${state.settings.ceEmblemUrl}" alt="CE Amblemi">` : '')
+    .replace(/{{TSE_EMBLEM}}/g, state.settings.tseEmblemUrl ? `<img src="${state.settings.tseEmblemUrl}" alt="TSE Amblemi">` : '')
+    .replace(/{{LOGO}}/g, state.settings.logo ? `<img src="${state.settings.logo}" alt="Logo" class="logo">` : '');
+
+  // Diğer tüm dinamik alanları doldurma
+  htmlContent = htmlContent
+    .replace(/{{COMPANY_NAME}}/g, state.settings.companyName)
+    .replace(/{{COMPANY_PHONE}}/g, state.settings.companyPhone)
+    .replace(/{{COMPANY_ADDRESS}}/g, companyAddressFormatted)
+    .replace(/{{BUILDING_NAME}}/g, building.name)
+    .replace(/{{DATE}}/g, `${currentDate} ${currentTime}`)
+    .replace(/{{MAINTENANCE_FEE_CALCULATED}}/g, `${maintenanceFee.toLocaleString('tr-TR')} ₺`)
+    .replace(/{{TECHNICIAN_NAME}}/g, technician)
+    .replace(/{{PARTS_SECTION}}/g, partsSectionHtml)
+    .replace(/{{DEBT_SECTION}}/g, debtSectionHtml)
+    .replace(/{{FINAL_TOTAL_AMOUNT}}/g, `${finalTotalAmount.toLocaleString('tr-TR')} ₺`);
 
   return htmlContent;
 }
@@ -1497,45 +1490,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const showReceiptModal = (htmlContent: string) => {
-    // Process emblem placeholders before showing modal
-    let processedHtml = htmlContent;
-
-    // CE Emblem replacement
-    if (state.settings.ceEmblemUrl) {
-      processedHtml = processedHtml.replace(
-        /{{CE_EMBLEM}}/g,
-        `<img src="${state.settings.ceEmblemUrl}" alt="CE Amblemi" style="max-height: 40px; object-fit: contain; display: inline-block; vertical-align: middle;">`
-      );
-    } else {
-      processedHtml = processedHtml.replace(/{{CE_EMBLEM}}/g, '');
-    }
-
-    // TSE Emblem replacement
-    if (state.settings.tseEmblemUrl) {
-      processedHtml = processedHtml.replace(
-        /{{TSE_EMBLEM}}/g,
-        `<img src="${state.settings.tseEmblemUrl}" alt="TSE Amblemi" style="max-height: 40px; object-fit: contain; display: inline-block; vertical-align: middle;">`
-      );
-    } else {
-      processedHtml = processedHtml.replace(/{{TSE_EMBLEM}}/g, '');
-    }
-
-    // Logo replacement
-    if (state.settings.logo) {
-      processedHtml = processedHtml.replace(
-        /{{LOGO}}/g,
-        `<img src="${state.settings.logo}" alt="Company Logo" class="logo" style="max-height: 60px; max-width: 150px;">`
-      );
-    } else {
-      processedHtml = processedHtml.replace(/{{LOGO}}/g, '');
-    }
-
-    // Company name replacement
-    if (state.settings.companyName) {
-      processedHtml = processedHtml.replace(/{{COMPANY_NAME}}/g, state.settings.companyName);
-    }
-
-    dispatch({ type: 'SHOW_RECEIPT_MODAL', payload: processedHtml });
+    dispatch({ type: 'SHOW_RECEIPT_MODAL', payload: htmlContent });
   };
 
   const closeReceiptModal = () => {
