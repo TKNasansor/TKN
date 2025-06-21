@@ -396,6 +396,7 @@ interface AppContextProps {
   updateAutoSaveData: (data: AutoSaveData) => void;
   openReceiptModal: (html: string) => void;
   closeReceiptModal: () => void;
+  addQRCodeData: (qrCodeData: any) => void;
 }
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
@@ -1561,6 +1562,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
   };
 
+  const addQRCodeData = (qrCodeData: any) => {
+    setState(prev => ({
+      ...prev,
+      qrCodes: [...prev.qrCodes, qrCodeData]
+    }));
+    
+    addUpdate('QR Kod Oluşturuldu', `${qrCodeData.buildingId} için QR kod oluşturuldu`);
+  };
+
   return (
     <AppContext.Provider value={{ 
       state, 
@@ -1602,7 +1612,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       reportFault,
       updateAutoSaveData,
       openReceiptModal,
-      closeReceiptModal
+      closeReceiptModal,
+      addQRCodeData
     }}>
       {children}
     </AppContext.Provider>
