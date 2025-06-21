@@ -23,7 +23,49 @@ const SettingsPage: React.FC = () => {
     }
   });
   const [templates, setTemplates] = useState({
-    receiptTemplate: state.settings?.receiptTemplate ?? '',
+    receiptTemplate: state.settings?.receiptTemplate ?? `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; box-shadow: 0 0 10px rgba(0,0,0,0.05);">
+  <div style="text-align: center; margin-bottom: 20px;">
+    {{LOGO}}
+    <h1 style="color: #333; font-size: 24px; margin: 5px 0;">{{COMPANY_NAME}}</h1>
+    <p style="color: #777; font-size: 12px;">{{COMPANY_ADDRESS}}</p>
+    <p style="color: #777; font-size: 12px;">{{COMPANY_PHONE}}</p>
+    <div style="margin-top: 10px;">
+      {{CE_EMBLEM}}
+      {{TSE_EMBLEM}}
+    </div>
+  </div>
+
+  <h2 style="text-align: center; color: #333; font-size: 20px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #eee;">BAKIM FİŞİ</h2>
+
+  <div style="margin-bottom: 15px;">
+    <p style="margin: 5px 0;"><strong>Bina Adı:</strong> {{BUILDING_NAME}}</p>
+    <p style="margin: 5px 0;"><strong>Bina Adresi:</strong> {{BUILDING_ADDRESS}}</p>
+    <p style="margin: 5px 0;"><strong>Asansör Sayısı:</strong> {{ELEVATOR_COUNT}}</p>
+  </div>
+
+  <div style="margin-bottom: 15px;">
+    <p style="margin: 5px 0;"><strong>Bakım Tarihi:</strong> {{DATE}}</p>
+    <p style="margin: 5px 0;"><strong>Bakım Saati:</strong> {{TIMESTAMP}}</p>
+    <p style="margin: 5px 0;"><strong>Teknisyen:</strong> {{TECHNICIAN}}</p>
+  </div>
+
+  <div style="margin-bottom: 15px;">
+    <p style="margin: 5px 0;"><strong>Yapılan İşlem:</strong> {{MAINTENANCE_ACTION}}</p>
+    <p style="margin: 5px 0;"><strong>Notlar:</strong> {{NOTES}}</p>
+  </div>
+
+  {{PARTS_SECTION}}
+
+  {{DEBT_SECTION}}
+
+  <div style="text-align: right; margin-top: 20px; padding-top: 10px; border-top: 1px solid #eee;">
+    <p style="font-size: 18px; font-weight: bold; margin: 5px 0;">Toplam Ücret: {{TOTAL_AMOUNT}}</p>
+  </div>
+
+  <div style="text-align: center; margin-top: 30px; font-size: 12px; color: #999;">
+    <p>Bu fiş, yapılan bakım hizmetinin belgesidir.</p>
+  </div>
+</div>`,
     installationProposalTemplate: state.settings?.installationProposalTemplate ?? '',
     maintenanceProposalTemplate: state.settings?.maintenanceProposalTemplate ?? '',
     revisionProposalTemplate: state.settings?.revisionProposalTemplate ?? '',
