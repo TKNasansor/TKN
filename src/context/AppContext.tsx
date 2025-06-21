@@ -119,7 +119,7 @@ const initialState: AppState = {
           background-repeat: no-repeat;
           background-position: center;
           background-size: contain;
-          opacity: 0.05; /* Filigranın şeffaflığını ayarlayın */
+          opacity: 0.1; /* Filigranın şeffaflığını ayarlayın (önceki 0.05'ten artırıldı) */
           z-index: 0; /* İçeriğin arkasında kalmasını sağlayın */
           pointer-events: none; /* Üzerine tıklamayı engeller */
         }
@@ -273,6 +273,27 @@ const initialState: AppState = {
         .parts-list li:last-child, .debt-list li:last-child {
           border-bottom: none;
         }
+        .debt-item { /* Yeni stil: Borç hareketleri için daha düzenli görünüm */
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px dotted #e9e9e9;
+            font-size: 14px;
+            flex-wrap: wrap; /* Küçük ekranlarda sığdırmak için */
+        }
+        .debt-item > span {
+            flex-basis: auto;
+            white-space: nowrap; /* Metnin tek satırda kalmasını sağlar */
+            margin-right: 10px; /* Elemanlar arası boşluk */
+        }
+        .debt-item > span:last-child {
+            margin-right: 0;
+        }
+        .debt-item-label {
+            font-weight: bold;
+            color: #555;
+        }
+
         .total-amount-section {
           display: flex;
           justify-content: space-between;
@@ -332,7 +353,7 @@ const initialState: AppState = {
             page-break-inside: avoid;
           }
           .watermark {
-            opacity: 0.1; /* Yazdırma için daha belirgin olabilir */
+            opacity: 0.15; /* Yazdırma için daha belirgin olabilir, önceki 0.1'den artırıldı */
           }
         }
       </style>
@@ -1280,9 +1301,9 @@ function generateMaintenanceReceipt(building: Building, state: AppState, technic
           totalPartsCost += cost;
           partsListHtml += `<li>${item.quantity} Adet ${part.name} - ${cost.toLocaleString('tr-TR')} ₺</li>`;
         }
-      } else { // Eğer bir ManualPartInstallation ise
+      } else { // Eğer bir ManualPartInstallation ise, "(Manuel)" ibaresi kaldırıldı
         totalPartsCost += item.totalPrice;
-        partsListHtml += `<li>${item.quantity} Adet ${item.partName} (Manuel) - ${item.totalPrice.toLocaleString('tr-TR')} ₺</li>`;
+        partsListHtml += `<li>${item.quantity} Adet ${item.partName} - ${item.totalPrice.toLocaleString('tr-TR')} ₺</li>`;
       }
     });
     partsListHtml += '</ul>';
@@ -1301,10 +1322,8 @@ function generateMaintenanceReceipt(building: Building, state: AppState, technic
   const buildingDebtRecords = state.debtRecords.filter(dr => dr.buildingId === building.id);
   let debtSectionHtml = '';
   if (buildingDebtRecords.length > 0) {
-    let debtListHtml = '<ul class="debt-list">';
-    // Son 5 borç kaydını göster (veya tümünü, ihtiyaca göre ayarlanabilir)
-    const recentDebtRecords = buildingDebtRecords.slice(-5); 
-    recentDebtRecords.forEach(record => {
+    let debtListHtml = ''; // <ul> yerine div içinde daha kontrollü bir yapı
+    buildingDebtRecords.forEach(record => {
       const recordDate = new Date(record.date).toLocaleDateString('tr-TR');
       let amountDisplay = '';
       if (record.type === 'maintenance' || record.type === 'part') {
@@ -1312,21 +1331,31 @@ function generateMaintenanceReceipt(building: Building, state: AppState, technic
       } else if (record.type === 'payment') {
         amountDisplay = `-${record.amount.toLocaleString('tr-TR')} ₺`;
       }
-      debtListHtml += `<li>${recordDate}: ${record.description} - ${amountDisplay} (Yeni Borç: ${record.newDebt.toLocaleString('tr-TR')} ₺)</li>`;
+      // Her bir borç kaydı için daha anlaşılır bir format
+      debtListHtml += `
+        <div class="debt-item">
+          <span class="debt-item-label">Tarih:</span><span>${recordDate}</span>
+          <span class="debt-item-label">Açıklama:</span><span>${record.description}</span>
+          <span class="debt-item-label">Tutar:</span><span>${amountDisplay}</span>
+          <span class="debt-item-label">Önceki Borç:</span><span>${record.previousDebt.toLocaleString('tr-TR')} ₺</span>
+          <span class="debt-item-label">Yeni Borç:</span><span>${record.newDebt.toLocaleString('tr-TR')} ₺</span>
+        </div>
+      `;
     });
-    debtListHtml += '</ul>';
 
     debtSectionHtml = `
       <div class="debt-section">
         <div class="section-title">Borç Hareketleri</div>
-        ${debtListHtml}
-        <p style="text-align: right; font-weight: bold; margin-top: 10px;">Güncel Borç: ${building.debt.toLocaleString('tr-TR')} ₺</p>
+        <div class="debt-list">
+          ${debtListHtml}
+        </div>
+        <p style="text-align: right; font-weight: bold; margin-top: 10px;">Binanın Güncel Borcu: ${building.debt.toLocaleString('tr-TR')} ₺</p>
       </div>
     `;
   }
 
-  // Fişin sadece bu bakımla ilgili toplam tutarı (bakım ücreti + takılan parçalar)
-  const finalTotalAmount = maintenanceFeeCalculated + totalPartsCost + building.debt; // Toplam tutara binanın mevcut borcunu da ekle
+  // Toplam Tutar: Sadece mevcut bakım ücreti ve takılan parçaların toplam maliyeti
+  const finalTotalAmount = maintenanceFeeCalculated + totalPartsCost; 
 
   // Şablonu al, yoksa boş string kullan (asıl şablon SettingsPage'den gelmeli)
   let htmlContent = state.settings.receiptTemplate || '';
