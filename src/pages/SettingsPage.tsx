@@ -480,8 +480,8 @@ const SettingsPage: React.FC = () => {
                       <div>{'{{COMPANY_NAME}}'} - Firma adı</div>
                       <div>{'{{COMPANY_ADDRESS}}'} - Firma adresi</div>
                       <div>{'{{COMPANY_PHONE}}'} - Firma telefonu</div>
-                      <div>{'{{CE_EMBLEM}}'} - CE amblemi</div>
-                      <div>{'{{TSE_EMBLEM}}'} - TSE amblemi</div>
+                      <div>{'{{CE_EMBLEM}}'} - {{CE_EMBLEM}}</div>
+                      <div>{'{{TSE_EMBLEM}}'} - {{TSE_EMBLEM}}</div>
                       <div>{'{{DATE}}'} - Tarih</div>
                       <div>{'{{BUILDING_NAME}}'} - Bina adı</div>
                       <div>{'{{BUILDING_ADDRESS}}'} - Bina adresi</div>
