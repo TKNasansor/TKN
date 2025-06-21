@@ -27,62 +27,72 @@ const initialState: AppState = {
     },
     ceEmblemUrl: '/ce.png',
     tseEmblemUrl: '/ts.jpg',
+    // GÖRSELDEKİ YENİ ŞABLONA GÖRE GÜNCELLENDİ
     receiptTemplate: `
       <div class="receipt-container">
         <div class="header-section">
           <div class="header-left">
-            {{LOGO}}
+            {{LOGO}} <!-- Firma Logosu -->
           </div>
           <div class="header-center">
-            <h1 class="company-name-title">{{COMPANY_NAME}}</h1>
-            <div class="company-contact">
-              <p>Adres: {{COMPANY_ADDRESS}}</p>
-              <p>Tel: {{COMPANY_PHONE}}</p>
-            </div>
+            <h1 class="company-name-title">{{COMPANY_NAME}}</h1> <!-- Firma Adı -->
           </div>
           <div class="header-right">
-            {{CE_EMBLEM}}
-            {{TSE_EMBLEM}}
+            {{TSE_EMBLEM}} <!-- TSE Amblemi -->
+            {{CE_EMBLEM}} <!-- CE Amblemi -->
           </div>
         </div>
 
         <div class="receipt-title-section">
-          <h2>BAKIM FİŞİ</h2>
+          <h2>BAKIM - ARIZA SERVİS FORMU</h2> <!-- Sabit Metin -->
+        </div>
+
+        <div class="contact-and-date-section">
+          <div class="contact-info">
+            <p>SERVİS NO : {{COMPANY_PHONE}}</p> <!-- Firma Telefonu -->
+            <p>{{COMPANY_ADDRESS}}</p> <!-- Firma Adresi -->
+          </div>
+          <div class="date-info">
+            <p>TARİH : {{DATE}}</p> <!-- Sadece Tarih -->
+          </div>
         </div>
 
         <div class="building-details-section">
-          <h3>Bina Adı: {{BUILDING_NAME}}</h3>
-          <p>Bakım Tarihi: {{DATE}}</p>
+          <h3>BİNANIN ADI : {{BUILDING_NAME}}</h3> <!-- Bina Adı -->
+        </div>
+
+        <div class="note-section">
+          <p>NOT : Bu bakımdan sonra meydana gelebilecek kapı camı kırılması, tavan aydınlatmasının kırılması durumlarında durumu hemen firmamıza
+          bildiriniz. Kırık kapı camı ile asansörü çalıştırmayınız. Aksi taktirde olabilecek durumlardan firmamız sorumlu olmayacaktır.</p>
         </div>
 
         <div class="maintenance-summary-section">
+          <h3>YAPILAN İŞLEMLER</h3> <!-- Sabit Metin -->
           <div class="summary-item">
-            <span>Yapılan İşlem:</span>
-            <span>Rutin Bakım</span>
-          </div>
-          <div class="summary-item">
-            <span>Bakım Ücreti:</span>
-            <span>{{MAINTENANCE_FEE_CALCULATED}}</span>
-          </div>
-          <div class="summary-item">
-            <span>Teknisyen:</span>
-            <span>{{TECHNICIAN_NAME}}</span>
+            <span>Bakım Yapıldı</span>
+            <span>{{MAINTENANCE_FEE_CALCULATED}}</span> <!-- Bakım Ücreti -->
           </div>
         </div>
 
-        {{PARTS_SECTION}}
-        {{DEBT_SECTION}}
+        {{PARTS_SECTION}} <!-- Takılan Parçalar Bölümü -->
+        {{DEBT_SECTION}} <!-- Borç Durumu Bölümü -->
 
         <div class="total-amount-section">
           <span>Toplam Tutar:</span>
-          <span class="final-total">{{FINAL_TOTAL_AMOUNT}}</span>
+          <span class="final-total">{{FINAL_TOTAL_AMOUNT}}</span> <!-- Toplam Tutar -->
         </div>
 
-        <div class="footer-section">
-          <p>Bu fiş, güvenliğiniz ve konforunuz için yapılan bakımın belgesidir. <br> İlginiz için teşekkür ederiz.</p>
+        <div class="footer-warning-section">
+          <p>! ! ! Asansör bakımı esnasında değiştirilmesi önerilen parçaların apartman yönetimi tarafından parça
+          değişimine onay verilmemesi durumunda doğacak aksaklık ve kazalardan firmamız sorumlu değildir.</p>
+        </div>
+        
+        <div class="signature-section">
+          <p>Asansör firma yetkilisi</p> <!-- Sabit Metin -->
+          <p>{{TECHNICIAN_NAME}}</p> <!-- Teknisyen Adı -->
         </div>
 
-        <div class="watermark" style="background-image: url('{{LOGO_WATERMARK_URL}}');"></div>
+        <div class="watermark" style="background-image: url('{{LOGO_WATERMARK_URL}}');"></div> <!-- Filigran Logo -->
       </div>
 
       <style>
@@ -138,13 +148,6 @@ const initialState: AppState = {
           margin: 0 0 5px 0;
           font-weight: bold;
         }
-        .company-contact {
-          font-size: 13px;
-          color: #555;
-        }
-        .company-contact p {
-          margin: 0;
-        }
         .header-right {
           display: flex;
           gap: 15px;
@@ -167,6 +170,18 @@ const initialState: AppState = {
           font-size: 22px;
           text-transform: uppercase;
         }
+        .contact-and-date-section {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 20px;
+          font-size: 14px;
+          color: #555;
+          position: relative;
+          z-index: 1;
+        }
+        .contact-info p, .date-info p {
+          margin: 5px 0;
+        }
         .building-details-section {
           background-color: #f8f8f8;
           padding: 15px 20px;
@@ -184,6 +199,20 @@ const initialState: AppState = {
           margin: 0;
           color: #666;
         }
+        .note-section {
+          background-color: #fffbe6;
+          border: 1px solid #ffe58f;
+          padding: 15px;
+          margin-bottom: 20px;
+          font-size: 13px;
+          color: #7a5f00;
+          border-radius: 5px;
+          position: relative;
+          z-index: 1;
+        }
+        .note-section p {
+          margin: 0;
+        }
         .maintenance-summary-section {
           margin-bottom: 20px;
           border: 1px solid #eee;
@@ -191,6 +220,14 @@ const initialState: AppState = {
           border-radius: 5px;
           position: relative;
           z-index: 1;
+        }
+        .maintenance-summary-section h3 {
+          font-size: 18px;
+          font-weight: bold;
+          color: #dc2626;
+          margin-bottom: 10px;
+          padding-bottom: 5px;
+          border-bottom: 1px solid #f0f0f0;
         }
         .summary-item {
           display: flex;
@@ -254,7 +291,7 @@ const initialState: AppState = {
           color: #dc2626;
           font-size: 24px;
         }
-        .footer-section {
+        .footer-warning-section {
           text-align: center;
           margin-top: 30px;
           padding-top: 15px;
@@ -264,8 +301,22 @@ const initialState: AppState = {
           position: relative;
           z-index: 1;
         }
-        .footer-section p {
+        .footer-warning-section p {
           margin: 0;
+          font-weight: bold;
+          color: #dc2626;
+        }
+        .signature-section {
+          text-align: right;
+          margin-top: 30px;
+          padding-top: 15px;
+          border-top: 1px solid #eee;
+          position: relative;
+          z-index: 1;
+        }
+        .signature-section p {
+          margin: 5px 0;
+          font-weight: bold;
         }
         @media print {
           .receipt-container {
@@ -273,9 +324,10 @@ const initialState: AppState = {
             border: none;
             padding: 0;
           }
-          .header-section, .receipt-title-section, .building-details-section,
-          .maintenance-summary-section, .parts-section, .debt-section,
-          .total-amount-section, .footer-section {
+          .header-section, .receipt-title-section, .contact-and-date-section,
+          .building-details-section, .note-section, .maintenance-summary-section,
+          .parts-section, .debt-section, .total-amount-section,
+          .footer-warning-section, .signature-section {
             box-shadow: none;
             page-break-inside: avoid;
           }
@@ -1198,24 +1250,15 @@ function appReducer(state: AppState, action: Action): AppState {
 
 // Bakım fişi HTML'ini oluşturan yardımcı fonksiyon
 function generateMaintenanceReceipt(building: Building, state: AppState, technician: string): string {
-  // Bakım tarihi ve saati
-  const currentDate = new Date().toLocaleDateString('tr-TR');
-  const currentTime = new Date().toLocaleTimeString('tr-TR', { 
-    hour: '2-digit', 
-    minute: '2-digit' 
-  });
+  // Bakım tarihi (sadece gün/ay/yıl)
+  const currentDateOnly = new Date().toLocaleDateString('tr-TR');
   
   // Bakım ücreti hesaplama
-  const maintenanceFee = building.maintenanceFee * building.elevatorCount;
+  const maintenanceFeeCalculated = building.maintenanceFee * building.elevatorCount;
 
   // Şirket adresini formatlama
   const companyAddressFormatted = state.settings.companyAddress ?
     `${state.settings.companyAddress.mahalle} ${state.settings.companyAddress.sokak} No:${state.settings.companyAddress.binaNo}, ${state.settings.companyAddress.ilce}/${state.settings.companyAddress.il}` :
-    'Adres belirtilmemiş';
-
-  // Bina adresini formatlama
-  const buildingAddressFormatted = building.address ?
-    `${building.address.mahalle} ${building.address.sokak} No:${building.address.binaNo}, ${building.address.ilce}/${building.address.il}` :
     'Adres belirtilmemiş';
 
   // Takılan Parçaları Oluşturma
@@ -1283,7 +1326,7 @@ function generateMaintenanceReceipt(building: Building, state: AppState, technic
   }
 
   // Fişin sadece bu bakımla ilgili toplam tutarı (bakım ücreti + takılan parçalar)
-  const finalTotalAmount = maintenanceFee + totalPartsCost; 
+  const finalTotalAmount = maintenanceFeeCalculated + totalPartsCost + building.debt; // Toplam tutara binanın mevcut borcunu da ekle
 
   // Şablonu al, yoksa boş string kullan (asıl şablon SettingsPage'den gelmeli)
   let htmlContent = state.settings.receiptTemplate || '';
@@ -1303,8 +1346,8 @@ function generateMaintenanceReceipt(building: Building, state: AppState, technic
     .replace(/{{COMPANY_PHONE}}/g, state.settings.companyPhone)
     .replace(/{{COMPANY_ADDRESS}}/g, companyAddressFormatted)
     .replace(/{{BUILDING_NAME}}/g, building.name)
-    .replace(/{{DATE}}/g, `${currentDate} ${currentTime}`)
-    .replace(/{{MAINTENANCE_FEE_CALCULATED}}/g, `${maintenanceFee.toLocaleString('tr-TR')} ₺`)
+    .replace(/{{DATE}}/g, currentDateOnly) // Sadece tarih, saat yok
+    .replace(/{{MAINTENANCE_FEE_CALCULATED}}/g, `${maintenanceFeeCalculated.toLocaleString('tr-TR')} ₺`)
     .replace(/{{TECHNICIAN_NAME}}/g, technician)
     .replace(/{{PARTS_SECTION}}/g, partsSectionHtml)
     .replace(/{{DEBT_SECTION}}/g, debtSectionHtml)
