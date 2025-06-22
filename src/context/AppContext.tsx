@@ -553,6 +553,7 @@ function appReducer(state: AppState, action: Action): AppState {
         previousDebt: building?.debt || 0,
         newDebt: (building?.debt || 0) + totalPartCost,
         performedBy: state.currentUser?.name || 'Bilinmeyen',
+        relatedRecordId: null, // Parça takılması bir bakım kaydı ile doğrudan ilişkili değil
       };
 
       return {
@@ -601,6 +602,7 @@ function appReducer(state: AppState, action: Action): AppState {
         previousDebt: manualBuilding?.debt || 0,
         newDebt: (manualBuilding?.debt || 0) + action.payload.totalPrice,
         performedBy: state.currentUser?.name || 'Bilinmeyen',
+        relatedRecordId: null, // Manuel parça takılması bir bakım kaydı ile doğrudan ilişkili değil
       };
 
       return {
@@ -713,8 +715,8 @@ function appReducer(state: AppState, action: Action): AppState {
       };
 
     case 'TOGGLE_MAINTENANCE':
-      const { buildingId, showReceipt } = action.payload;
-      const targetBuilding = state.buildings.find(b => b.id === buildingId);
+      const { buildingId: tmBuildingId, showReceipt } = action.payload;
+      const targetBuilding = state.buildings.find(b => b.id === tmBuildingId);
       
       if (!targetBuilding) return state;
 
@@ -743,7 +745,7 @@ function appReducer(state: AppState, action: Action): AppState {
       });
 
       let updatedBuildingsForMaintenance = state.buildings.map(b =>
-        b.id === buildingId
+        b.id === tmBuildingId
           ? {
               ...b,
               isMaintained: newMaintenanceStatus,
@@ -762,53 +764,11 @@ function appReducer(state: AppState, action: Action): AppState {
       let newMaintenanceHistory = [...state.maintenanceHistory];
       let newMaintenanceRecords = [...state.maintenanceRecords];
 
-      // Bakım ücretinin bu ay içinde zaten eklenip eklenmediğini kontrol et (sadece 1 defa yazılsın)
-      const currentMonth = new Date().toISOString().substring(0, 7); //YYYY-MM formatı
-      const maintenanceFeeAlreadyAddedThisMonth = state.debtRecords.some(dr =>
-          dr.buildingId === buildingId &&
-          dr.type === 'maintenance' &&
-          dr.date.substring(0, 7) === currentMonth
-      );
-
-      if (!maintenanceFeeAlreadyAddedThisMonth) {
-          const maintenanceFee = targetBuilding.maintenanceFee * targetBuilding.elevatorCount;
-          
-          // Bina borcunu güncelle (Sadece bu ay için ilk kez ekle)
-          updatedBuildingsForMaintenance = updatedBuildingsForMaintenance.map(b =>
-            b.id === buildingId
-                ? { ...b, debt: b.debt + maintenanceFee }
-                : b
-          );
-
-          // Borç kaydı ekle (Sadece bu ay için ilk kez ekle)
-          const maintenanceDebtRecord: DebtRecord = {
-              id: uuidv4(),
-              buildingId,
-              date: currentDateISO,
-              type: 'maintenance',
-              description: `Bakım ücreti (${targetBuilding.elevatorCount} asansör)`,
-              amount: maintenanceFee,
-              previousDebt: targetBuilding.debt,
-              newDebt: (targetBuilding.debt || 0) + maintenanceFee,
-              performedBy: state.currentUser?.name || 'Bilinmeyen',
-          };
-          newDebtRecords = [...newDebtRecords, maintenanceDebtRecord];
-      }
-
-      // Bakım geçmişine ve kayıtlarına her ziyaret için ekle, ücret eklenmese bile
-      const maintenanceHistoryRecord: MaintenanceHistory = {
-        id: uuidv4(),
-        buildingId,
-        maintenanceDate: currentDateISO,
-        maintenanceTime: currentTimeLocale,
-        performedBy: state.currentUser?.name || 'Bilinmeyen',
-        maintenanceFee: targetBuilding.maintenanceFee * targetBuilding.elevatorCount, // Bu ziyaretin ücreti
-      };
-      newMaintenanceHistory = [...newMaintenanceHistory, maintenanceHistoryRecord];
-
+      // Yeni bir MaintenanceRecord oluştur
+      const newMaintenanceRecordId = uuidv4();
       const maintenanceRecordCurrentVisit: MaintenanceRecord = { 
-        id: uuidv4(),
-        buildingId,
+        id: newMaintenanceRecordId,
+        buildingId: tmBuildingId,
         performedBy: state.currentUser?.name || 'Bilinmeyen',
         maintenanceDate: currentDateISO,
         maintenanceTime: currentTimeLocale,
@@ -819,6 +779,53 @@ function appReducer(state: AppState, action: Action): AppState {
         searchableText: `${targetBuilding.name} ${state.currentUser?.name || 'Bilinmeyen'} bakım`,
       };
       newMaintenanceRecords = [...newMaintenanceRecords, maintenanceRecordCurrentVisit];
+
+      // Bakım ücretinin bu ay içinde zaten eklenip eklenmediğini kontrol et (sadece 1 defa yazılsın)
+      const currentMonth = new Date().toISOString().substring(0, 7); //YYYY-MM formatı
+      const maintenanceFeeAlreadyAddedThisMonth = state.debtRecords.some(dr =>
+          dr.buildingId === tmBuildingId &&
+          dr.type === 'maintenance' &&
+          dr.date.substring(0, 7) === currentMonth &&
+          dr.relatedRecordId === newMaintenanceRecordId // Bu id ile daha önce eklenip eklenmediğini kontrol et
+      );
+
+      if (!maintenanceFeeAlreadyAddedThisMonth) {
+          const maintenanceFee = targetBuilding.maintenanceFee * targetBuilding.elevatorCount;
+          
+          // Bina borcunu güncelle (Sadece bu ay için ilk kez ekle)
+          updatedBuildingsForMaintenance = updatedBuildingsForMaintenance.map(b =>
+            b.id === tmBuildingId
+                ? { ...b, debt: b.debt + maintenanceFee }
+                : b
+          );
+
+          // Borç kaydı ekle (Sadece bu ay için ilk kez ekle)
+          const maintenanceDebtRecord: DebtRecord = {
+              id: uuidv4(),
+              buildingId: tmBuildingId,
+              date: currentDateISO,
+              type: 'maintenance',
+              description: `Bakım ücreti (${targetBuilding.elevatorCount} asansör)`,
+              amount: maintenanceFee,
+              previousDebt: targetBuilding.debt,
+              newDebt: (targetBuilding.debt || 0) + maintenanceFee,
+              performedBy: state.currentUser?.name || 'Bilinmeyen',
+              relatedRecordId: newMaintenanceRecordId, // İlişkili MaintenanceRecord id'sini ekle
+          };
+          newDebtRecords = [...newDebtRecords, maintenanceDebtRecord];
+      }
+
+      // Bakım geçmişine her ziyaret için ekle, ücret eklenmese bile
+      const maintenanceHistoryRecord: MaintenanceHistory = {
+        id: uuidv4(),
+        buildingId: tmBuildingId,
+        maintenanceDate: currentDateISO,
+        maintenanceTime: currentTimeLocale,
+        performedBy: state.currentUser?.name || 'Bilinmeyen',
+        maintenanceFee: targetBuilding.maintenanceFee * targetBuilding.elevatorCount, // Bu ziyaretin ücreti
+        relatedRecordId: newMaintenanceRecordId, // İlişkili MaintenanceRecord id'sini ekle
+      };
+      newMaintenanceHistory = [...newMaintenanceHistory, maintenanceHistoryRecord];
 
 
       const finalStateAfterMaintenance = {
@@ -846,9 +853,10 @@ function appReducer(state: AppState, action: Action): AppState {
         // Makbuzu arşivle
         const archivedReceipt: ArchivedReceipt = {
             id: uuidv4(),
-            buildingId: buildingId,
+            buildingId: tmBuildingId,
             timestamp: new Date().toISOString(),
             htmlContent: receiptHtml,
+            relatedRecordId: newMaintenanceRecordId, // İlişkili MaintenanceRecord id'sini ekle
         };
         
         return {
@@ -1122,6 +1130,7 @@ function appReducer(state: AppState, action: Action): AppState {
         previousDebt: paymentBuilding?.debt || 0,
         newDebt: Math.max(0, (paymentBuilding?.debt || 0) - action.payload.amount),
         performedBy: action.payload.receivedBy,
+        relatedRecordId: null, // Ödeme bir bakım kaydı ile doğrudan ilişkili değil
       };
 
       return {
@@ -1332,6 +1341,60 @@ function appReducer(state: AppState, action: Action): AppState {
             ],
         };
 
+    case 'REVERT_MAINTENANCE':
+        const buildingIdToRevert = action.payload;
+        const buildingToRevert = state.buildings.find(b => b.id === buildingIdToRevert);
+        if (!buildingToRevert) return state;
+
+        // Binanın en son bakım kaydını bul
+        const latestMaintenanceRecord = state.maintenanceRecords
+            .filter(mr => mr.buildingId === buildingIdToRevert)
+            .sort((a, b) => new Date(b.maintenanceDate + ' ' + b.maintenanceTime).getTime() - new Date(a.maintenanceDate + ' ' + a.maintenanceTime).getTime())
+            .shift(); // En sonuncuyu al ve diziden çıkar
+
+        if (!latestMaintenanceRecord) {
+            console.warn(`No maintenance record found for building ${buildingIdToRevert} to revert.`);
+            return state;
+        }
+
+        // İlişkili kayıtları filtrele
+        const newMaintenanceRecordsAfterRevert = state.maintenanceRecords.filter(mr => mr.id !== latestMaintenanceRecord.id);
+        const newMaintenanceHistoryAfterRevert = state.maintenanceHistory.filter(mh => mh.relatedRecordId !== latestMaintenanceRecord.id);
+        const newDebtRecordsAfterRevert = state.debtRecords.filter(dr => dr.relatedRecordId !== latestMaintenanceRecord.id);
+        const newArchivedReceiptsAfterRevert = state.archivedReceipts.filter(ar => ar.relatedRecordId !== latestMaintenanceRecord.id);
+
+        // Bina borcunu geri al
+        const revertedDebtAmount = latestMaintenanceRecord.totalFee;
+        const updatedBuildingsAfterRevert = state.buildings.map(b =>
+            b.id === buildingIdToRevert
+                ? { ...b, 
+                    isMaintained: false, 
+                    lastMaintenanceDate: undefined, 
+                    lastMaintenanceTime: undefined,
+                    debt: b.debt - revertedDebtAmount // Bakım ücretini borçtan düş
+                }
+                : b
+        );
+
+        return {
+            ...state,
+            buildings: updatedBuildingsAfterRevert,
+            maintenanceRecords: newMaintenanceRecordsAfterRevert,
+            maintenanceHistory: newMaintenanceHistoryAfterRevert,
+            debtRecords: newDebtRecordsAfterRevert,
+            archivedReceipts: newArchivedReceiptsAfterRevert,
+            updates: [
+                {
+                    id: uuidv4(),
+                    action: 'Bakım Geri Alındı',
+                    user: state.currentUser?.name || 'Bilinmeyen',
+                    timestamp: new Date().toISOString(),
+                    details: `${buildingToRevert.name} binasının son bakımı geri alındı.`,
+                },
+                ...state.updates,
+            ],
+        };
+
     case 'SHOW_PRINTER_SELECTION':
       return {
         ...state,
@@ -1482,6 +1545,17 @@ function generateMaintenanceReceipt(building: Building, state: AppState, technic
   return htmlContent;
 }
 
+// Belirli bir bina için en son arşivlenmiş bakım fişinin HTML içeriğini döndürür
+function getLatestArchivedReceiptHtml(buildingId: string, state: AppState): string | null {
+    const latestReceipt = state.archivedReceipts
+        .filter(ar => ar.buildingId === buildingId)
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        .shift(); // En sonuncu fişi alır
+
+    return latestReceipt ? latestReceipt.htmlContent : null;
+}
+
+
 const AppContext = createContext<{
   state: AppState;
   addBuilding: (building: Omit<Building, 'id'>) => void;
@@ -1534,6 +1608,8 @@ const AppContext = createContext<{
   showArchivedReceipt: (receiptId: string) => void; // Arşivlenmiş fişi gösterme fonksiyonu
   removeMaintenanceStatusMark: (buildingId: string) => void; // Bakım işaretini kaldırma fonksiyonu
   cancelMaintenance: (buildingId: string) => void; // Bakımı iptal etme fonksiyonu
+  revertMaintenance: (buildingId: string) => void; // Bakımı geri alma fonksiyonu
+  getLatestArchivedReceiptHtml: (buildingId: string) => string | null; // En son arşivlenmiş fiş HTML'ini getirme fonksiyonu
 } | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -1750,6 +1826,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     dispatch({ type: 'CANCEL_MAINTENANCE', payload: buildingId });
   };
 
+  const revertMaintenance = (buildingId: string) => {
+    dispatch({ type: 'REVERT_MAINTENANCE', payload: buildingId });
+  };
+
+  const getLatestArchivedReceiptHtmlMemoized = (buildingId: string): string | null => {
+    return getLatestArchivedReceiptHtml(buildingId, state);
+  };
 
   return (
     <AppContext.Provider
@@ -1806,6 +1889,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         showArchivedReceipt,
         removeMaintenanceStatusMark,
         cancelMaintenance,
+        revertMaintenance, // Yeni eklenen fonksiyon
+        getLatestArchivedReceiptHtml: getLatestArchivedReceiptHtmlMemoized, // Yeni eklenen yardımcı fonksiyon
       }}
     >
       {children}
