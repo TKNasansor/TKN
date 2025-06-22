@@ -77,11 +77,13 @@ const initialState: AppState = {
         </div>
 
         {{PARTS_SECTION}} <!-- Takılan Parçalar Bölümü (varsa) -->
-        {{DEBT_SECTION}} <!-- Borç Durumu Bölümü (varsa) -->
+        
+        <!-- Borç Durumu kaldırıldı. Eğer bina borçluysa toplam tutar altında yazacak. -->
 
         <div class="total-amount-section">
           <span>Toplam Tutar:</span>
           <span class="final-total">{{FINAL_TOTAL_AMOUNT}}</span> <!-- Toplam Tutar -->
+          {{BUILDING_CURRENT_DEBT_SECTION}} <!-- Binanın Güncel Borcu (varsa) -->
         </div>
 
         <div class="footer-warning-section">
@@ -244,60 +246,13 @@ const initialState: AppState = {
           font-weight: bold;
           color: #444;
         }
-        .parts-section, .debt-section {
-          margin-top: 25px;
-          margin-bottom: 25px;
-          border: 1px solid #eee;
-          padding: 15px;
-          border-radius: 5px;
-          background-color: #fdfdfd;
-          position: relative;
-          z-index: 1;
-        }
-        .section-title {
-          font-size: 18px;
-          font-weight: bold;
-          color: #dc2626;
-          margin-bottom: 10px;
-          padding-bottom: 5px;
-          border-bottom: 1px solid #f0f0f0;
-        }
-        .parts-list, .debt-list {
-          list-style-type: none;
-          padding: 0;
-          margin: 0;
-        }
-        .parts-list li, .debt-list li {
-          padding: 5px 0;
-          border-bottom: 1px dotted #e9e9e9;
-          font-size: 14px;
-        }
-        .parts-list li:last-child, .debt-list li:last-child {
-          border-bottom: none;
-        }
-        .debt-item { /* Yeni stil: Borç hareketleri için daha düzenli görünüm */
-            display: flex;
-            justify-content: space-between;
-            padding: 5px 0;
-            border-bottom: 1px dotted #e9e9e9;
-            font-size: 14px;
-            flex-wrap: wrap; /* Küçük ekranlarda sığdırmak için */
-            gap: 5px; /* Elemanlar arası boşluk */
-        }
-        .debt-item > span {
-            flex-basis: auto;
-            white-space: nowrap; /* Metnin tek satırda kalmasını sağlar */
-        }
-        .debt-item-label {
-            font-weight: bold;
-            color: #555;
-            margin-right: 5px;
-        }
-
+        /* Borç hareketleri bölümü tamamen kaldırıldığı için ilgili stiller de kaldırılabilir. */
+        /* Eğer building-current-debt-section için stil eklemek isterseniz buraya ekleyebilirsiniz. */
         .total-amount-section {
           display: flex;
+          flex-direction: column; /* İçerik alt alta gelsin diye */
           justify-content: space-between;
-          align-items: center;
+          align-items: flex-end; /* Sağ tarafa hizala */
           background-color: #f3f4f6;
           padding: 15px 20px;
           border-top: 2px solid #dc2626;
@@ -308,9 +263,21 @@ const initialState: AppState = {
           position: relative;
           z-index: 1;
         }
+        .total-amount-section span:first-child {
+            width: 100%;
+            text-align: right;
+            margin-bottom: 5px;
+        }
         .final-total {
           color: #dc2626;
           font-size: 24px;
+        }
+        .building-current-debt {
+            width: 100%;
+            text-align: right;
+            font-size: 16px;
+            color: #555;
+            margin-top: 10px;
         }
         .footer-warning-section {
           text-align: center;
@@ -347,7 +314,7 @@ const initialState: AppState = {
           }
           .header-section, .receipt-title-section, .contact-and-date-section,
           .building-details-section, .note-section, .maintenance-summary-section,
-          .parts-section, .debt-section, .total-amount-section,
+          .parts-section, .total-amount-section,
           .footer-warning-section, .signature-section {
             box-shadow: none;
             page-break-inside: avoid;
@@ -438,7 +405,8 @@ type Action =
   | { type: 'CLOSE_PRINTER_SELECTION' }
   | { type: 'INCREASE_PRICES'; payload: number }
   | { type: 'SHOW_ARCHIVED_RECEIPT'; payload: string } // Yeni aksiyon: Arşivlenmiş fişi göster
-  | { type: 'REMOVE_MAINTENANCE_STATUS_MARK'; payload: string }; // Yeni aksiyon: Bakım işaretini kaldır
+  | { type: 'REMOVE_MAINTENANCE_STATUS_MARK'; payload: string } // Yeni aksiyon: Bakım işaretini kaldır
+  | { type: 'CANCEL_MAINTENANCE'; payload: string }; // Yeni aksiyon: Bakımı iptal et
 
 function appReducer(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -753,7 +721,8 @@ function appReducer(state: AppState, action: Action): AppState {
       // Eğer bina zaten bakım yapıldı olarak işaretliyse, bu aksiyonun doğrudan durumu değiştirmesini engelliyoruz.
       // UI katmanı bu durumu yakalayıp kullanıcıya seçenekler sunmalı.
       if (targetBuilding.isMaintained) {
-        // Eğer UI'dan gelen istek sadece mevcut fişi göstermekse
+        // Bu noktada UI'dan gelen 'showReceipt' isteği, kullanıcının doğrudan fişi görüntülemek istediği anlamına gelir.
+        // Bu durum, 'Bakımı iptal et' seçeneğinden ayrıdır.
         if (showReceipt) {
             const receiptHtml = generateMaintenanceReceipt(targetBuilding, state, state.currentUser?.name || 'Bilinmeyen');
             return {
@@ -793,8 +762,8 @@ function appReducer(state: AppState, action: Action): AppState {
       let newMaintenanceHistory = [...state.maintenanceHistory];
       let newMaintenanceRecords = [...state.maintenanceRecords];
 
-      // Bakım ücretinin bu ay içinde zaten eklenip eklenmediğini kontrol et
-      const currentMonth = new Date().toISOString().substring(0, 7); //YYYY-AA formatı
+      // Bakım ücretinin bu ay içinde zaten eklenip eklenmediğini kontrol et (sadece 1 defa yazılsın)
+      const currentMonth = new Date().toISOString().substring(0, 7); //YYYY-MM formatı
       const maintenanceFeeAlreadyAddedThisMonth = state.debtRecords.some(dr =>
           dr.buildingId === buildingId &&
           dr.type === 'maintenance' &&
@@ -837,7 +806,7 @@ function appReducer(state: AppState, action: Action): AppState {
       };
       newMaintenanceHistory = [...newMaintenanceHistory, maintenanceHistoryRecord];
 
-      const maintenanceRecordCurrentVisit: MaintenanceRecord = { // Değişken adı benzersiz yapıldı
+      const maintenanceRecordCurrentVisit: MaintenanceRecord = { 
         id: uuidv4(),
         buildingId,
         performedBy: state.currentUser?.name || 'Bilinmeyen',
@@ -1001,7 +970,6 @@ function appReducer(state: AppState, action: Action): AppState {
       };
 
     case 'ADD_MAINTENANCE_RECORD':
-      // Değişken adı benzersiz yapıldı
       const newMaintenanceRecord: MaintenanceRecord = { 
         ...action.payload,
         id: uuidv4(),
@@ -1293,6 +1261,77 @@ function appReducer(state: AppState, action: Action): AppState {
             ],
         };
 
+    case 'CANCEL_MAINTENANCE':
+        const buildingToCancelMaintenance = state.buildings.find(b => b.id === action.payload);
+        if (!buildingToCancelMaintenance) return state;
+
+        let updatedBuildingsAfterCancel = state.buildings.map(b =>
+            b.id === action.payload
+                ? { ...b, isMaintained: false, lastMaintenanceDate: undefined, lastMaintenanceTime: undefined }
+                : b
+        );
+
+        let updatedDebtRecordsAfterCancel = [...state.debtRecords];
+        let updatedMaintenanceHistoryAfterCancel = [...state.maintenanceHistory];
+        let updatedMaintenanceRecordsAfterCancel = [...state.maintenanceRecords];
+
+        const currentMonthYearForCancel = new Date().toISOString().substring(0, 7);
+
+        // Bakım ücreti borcunu geri al (sadece bu ay içinde eklenen bakım borcunu)
+        const lastMaintenanceDebtRecordIndex = updatedDebtRecordsAfterCancel.findIndex(dr =>
+            dr.buildingId === action.payload &&
+            dr.type === 'maintenance' &&
+            dr.date.substring(0, 7) === currentMonthYearForCancel // Sadece bu ayın bakım borcunu iptal et
+        );
+
+        if (lastMaintenanceDebtRecordIndex !== -1) {
+            const canceledMaintenanceDebt = updatedDebtRecordsAfterCancel[lastMaintenanceDebtRecordIndex].amount;
+            updatedDebtRecordsAfterCancel.splice(lastMaintenanceDebtRecordIndex, 1); // Borç kaydını kaldır
+
+            // Binanın borcunu güncelle
+            updatedBuildingsAfterCancel = updatedBuildingsAfterCancel.map(b =>
+                b.id === action.payload
+                    ? { ...b, debt: b.debt - canceledMaintenanceDebt }
+                    : b
+            );
+        }
+
+        // Son bakım geçmişi kaydını kaldır
+        const lastMaintenanceHistoryIndex = updatedMaintenanceHistoryAfterCancel.findIndex(mh => 
+            mh.buildingId === action.payload && 
+            mh.maintenanceDate.substring(0, 7) === currentMonthYearForCancel
+        ); // Sadece bu ayın geçmişini kaldır
+        if (lastMaintenanceHistoryIndex !== -1) {
+            updatedMaintenanceHistoryAfterCancel.splice(lastMaintenanceHistoryIndex, 1);
+        }
+
+        // Son bakım kaydını kaldır
+        const lastMaintenanceRecordIndex = updatedMaintenanceRecordsAfterCancel.findIndex(mr => 
+            mr.buildingId === action.payload &&
+            mr.maintenanceDate.substring(0, 7) === currentMonthYearForCancel
+        ); // Sadece bu ayın kaydını kaldır
+        if (lastMaintenanceRecordIndex !== -1) {
+            updatedMaintenanceRecordsAfterCancel.splice(lastMaintenanceRecordIndex, 1);
+        }
+
+        return {
+            ...state,
+            buildings: updatedBuildingsAfterCancel,
+            debtRecords: updatedDebtRecordsAfterCancel,
+            maintenanceHistory: updatedMaintenanceHistoryAfterCancel,
+            maintenanceRecords: updatedMaintenanceRecordsAfterCancel,
+            updates: [
+                {
+                    id: uuidv4(),
+                    action: 'Bakım İptal Edildi',
+                    user: state.currentUser?.name || 'Bilinmeyen',
+                    timestamp: new Date().toISOString(),
+                    details: `${buildingToCancelMaintenance.name} binasının son bakımı iptal edildi.`,
+                },
+                ...state.updates,
+            ],
+        };
+
     case 'SHOW_PRINTER_SELECTION':
       return {
         ...state,
@@ -1389,48 +1428,6 @@ function generateMaintenanceReceipt(building: Building, state: AppState, technic
     `;
   }
 
-  // Borç Durumunu Oluşturma
-  let debtSectionHtml = '';
-  if (building.debt > 0) { // Sadece binanın borcu varsa göster
-    let debtListHtml = ''; 
-    // Sadece borç artırıcı (maintenance, part) ve azaltıcı (payment) işlemleri göster.
-    // Tarih kaldırıldı, açıklama, tutar, önceki/yeni borç gösterilecek.
-    const relevantDebtRecords = state.debtRecords.filter(dr => 
-      dr.buildingId === building.id && 
-      (dr.type === 'maintenance' || dr.type === 'part' || dr.type === 'payment')
-    );
-
-    // Eğer hiç ilgili borç kaydı yoksa bu bölümü oluşturma
-    if (relevantDebtRecords.length > 0) {
-        relevantDebtRecords.forEach(record => {
-            let amountDisplay = '';
-            if (record.type === 'maintenance' || record.type === 'part') {
-                amountDisplay = `<span style="color: green;">+${record.amount.toLocaleString('tr-TR')} ₺</span>`; // Pozitif borç için yeşil
-            } else if (record.type === 'payment') {
-                amountDisplay = `<span style="color: red;">-${record.amount.toLocaleString('tr-TR')} ₺</span>`; // Ödeme için kırmızı
-            }
-            debtListHtml += `
-                <div class="debt-item">
-                    <span class="debt-item-label">Açıklama:</span><span>${record.description}</span>
-                    <span class="debt-item-label">Tutar:</span><span>${amountDisplay}</span>
-                    <span class="debt-item-label">Önceki Borç:</span><span>${record.previousDebt.toLocaleString('tr-TR')} ₺</span>
-                    <span class="debt-item-label">Yeni Borç:</span><span>${record.newDebt.toLocaleString('tr-TR')} ₺</span>
-                </div>
-            `;
-        });
-
-        debtSectionHtml = `
-            <div class="debt-section">
-                <div class="section-title">Borç Durumu</div>
-                <div class="debt-list">
-                    ${debtListHtml}
-                </div>
-                <p style="text-align: right; font-weight: bold; margin-top: 10px;">Binanın Güncel Borcu: ${building.debt.toLocaleString('tr-TR')} ₺</p>
-            </div>
-        `;
-    }
-  }
-
   // Bakım Notu Bölümü Oluşturma (varsa)
   let maintenanceNoteSectionHtml = '';
   if (building.maintenanceNote && building.maintenanceNote.trim() !== '') { // Not boş değilse göster
@@ -1441,6 +1438,15 @@ function generateMaintenanceReceipt(building: Building, state: AppState, technic
       </div>
     `;
   }
+
+  // Binanın Güncel Borcu bölümü (sadece borç varsa)
+  let buildingCurrentDebtSectionHtml = '';
+  if (building.debt > 0) {
+    buildingCurrentDebtSectionHtml = `
+      <p class="building-current-debt">Binanın Güncel Borcu: ${building.debt.toLocaleString('tr-TR')} ₺</p>
+    `;
+  }
+
 
   // Toplam Tutar: Sadece mevcut bakım ücreti ve takılan parçaların toplam maliyeti
   const finalTotalAmount = maintenanceFeeCalculated + totalPartsCost; 
@@ -1467,9 +1473,11 @@ function generateMaintenanceReceipt(building: Building, state: AppState, technic
     .replace(/{{MAINTENANCE_FEE_CALCULATED}}/g, `${maintenanceFeeCalculated.toLocaleString('tr-TR')} ₺`)
     .replace(/{{TECHNICIAN_NAME}}/g, technician)
     .replace(/{{PARTS_SECTION}}/g, partsSectionHtml)
-    .replace(/{{DEBT_SECTION}}/g, debtSectionHtml)
+    // Borç bölümünü tamamen kaldırıldığı için DEBT_SECTION yer tutucusu boş string ile değiştirildi
+    .replace(/{{DEBT_SECTION}}/g, '') 
     .replace(/{{MAINTENANCE_NOTE_SECTION}}/g, maintenanceNoteSectionHtml) // Bakım notu bölümünü ekle
-    .replace(/{{FINAL_TOTAL_AMOUNT}}/g, `${finalTotalAmount.toLocaleString('tr-TR')} ₺`);
+    .replace(/{{FINAL_TOTAL_AMOUNT}}/g, `${finalTotalAmount.toLocaleString('tr-TR')} ₺`)
+    .replace(/{{BUILDING_CURRENT_DEBT_SECTION}}/g, buildingCurrentDebtSectionHtml); // Binanın güncel borcu bölümünü ekle
 
   return htmlContent;
 }
@@ -1523,6 +1531,9 @@ const AppContext = createContext<{
   showPrinterSelection: (content: string) => void;
   closePrinterSelection: () => void;
   increasePrices: (percentage: number) => void;
+  showArchivedReceipt: (receiptId: string) => void; // Arşivlenmiş fişi gösterme fonksiyonu
+  removeMaintenanceStatusMark: (buildingId: string) => void; // Bakım işaretini kaldırma fonksiyonu
+  cancelMaintenance: (buildingId: string) => void; // Bakımı iptal etme fonksiyonu
 } | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -1735,6 +1746,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     dispatch({ type: 'REMOVE_MAINTENANCE_STATUS_MARK', payload: buildingId });
   };
 
+  const cancelMaintenance = (buildingId: string) => {
+    dispatch({ type: 'CANCEL_MAINTENANCE', payload: buildingId });
+  };
+
 
   return (
     <AppContext.Provider
@@ -1790,6 +1805,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         // Yeni eklenen aksiyonları buraya da ekle
         showArchivedReceipt,
         removeMaintenanceStatusMark,
+        cancelMaintenance,
       }}
     >
       {children}
