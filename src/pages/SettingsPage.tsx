@@ -30,8 +30,8 @@ const SettingsPage: React.FC = () => {
     <p style="color: #777; font-size: 12px;">{{COMPANY_ADDRESS}}</p>
     <p style="color: #777; font-size: 12px;">{{COMPANY_PHONE}}</p>
     <div style="margin-top: 10px;">
-      ${'{{CE_EMBLEM}}'}
-      ${'{{TSE_EMBLEM}}'}
+      \{\{CE_EMBLEM\}\}
+      \{\{TSE_EMBLEM\}\}
     </div>
   </div>
 
