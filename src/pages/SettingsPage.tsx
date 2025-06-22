@@ -1,9 +1,52 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react'; // useEffect'i import etmeyi unutmayın
 import { useApp } from '../context/AppContext';
-import { Settings, User, Edit2, Save, X, Trash2, Building, FileText, QrCode, Upload, Plus } from 'lucide-react';
+import { AppSettings } from '../types'; // AppSettings tipini import edin
+import { Plus, Search, X, Check, QrCode, Trash2, Tag, AlertTriangle, Settings, User, Edit2, Save, Building, FileText, Upload } from 'lucide-react'; // Gerekli ikonlar
 
 const SettingsPage: React.FC = () => {
-  const { state, updateSettings, deleteUser, addProposalTemplate, updateProposalTemplate, deleteProposalTemplate } = useApp();
+  // AppContext'ten state ve updateSettings fonksiyonunu çekiyoruz
+  const { state, updateSettings, deleteUser, addProposalTemplate, updateProposalTemplate, deleteProposalTemplate, addNotification } = useApp(); // addNotification'ı da çekiyoruz
+
+  // Yerel state'i, global settings'ten başlatıyoruz
+  // Eğer state.settings null/undefined ise boş bir obje ile başlatılır, böylece hata alınmaz.
+  const [localSettings, setLocalSettings] = useState<Partial<AppSettings>>(state.settings || {});
+
+  // Global settings değiştiğinde yerel state'i senkronize et
+  useEffect(() => {
+    setLocalSettings(state.settings || {});
+  }, [state.settings]);
+
+  // Input alanları değiştikçe yerel state'i güncelle
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+
+    // Adres alanları için özel işlem
+    if (name.startsWith('companyAddress.')) {
+      const addressField = name.split('.')[1] as keyof AppSettings['companyAddress'];
+      setLocalSettings(prev => ({
+        ...prev,
+        companyAddress: {
+          ...(prev.companyAddress || {}), // companyAddress null olabilir, kontrol
+          [addressField]: value
+        }
+      }));
+    } else {
+      setLocalSettings(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
+  };
+
+  // Kaydet butonuna basıldığında
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    // updateSettings fonksiyonunu çağırarak global state'i güncelle
+    updateSettings(localSettings);
+    addNotification('Ayarlar başarıyla kaydedildi!'); // Bildirim ekle
+  };
+
+  // Eski koddan kalan diğer state ve fonksiyon tanımlamaları
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingCompany, setEditingCompany] = useState(false);
   const [editingTemplates, setEditingTemplates] = useState<string | null>(null);
@@ -23,54 +66,21 @@ const SettingsPage: React.FC = () => {
     }
   });
   const [templates, setTemplates] = useState({
-    receiptTemplate: state.settings?.receiptTemplate ?? `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; box-shadow: 0 0 10px rgba(0,0,0,0.05);">
-  <div style="text-align: center; margin-bottom: 20px;">
-    {{LOGO}}
-    <h1 style="color: #333; font-size: 24px; margin: 5px 0;">{{COMPANY_NAME}}</h1>
-    <p style="color: #777; font-size: 12px;">{{COMPANY_ADDRESS}}</p>
-    <p style="color: #777; font-size: 12px;">{{COMPANY_PHONE}}</p>
-    <div style="margin-top: 10px;">
-      \{\{CE_EMBLEM\}\}
-      \{\{TSE_EMBLEM\}\}
-    </div>
-  </div>
-
-  <h2 style="text-align: center; color: #333; font-size: 20px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #eee;">BAKIM FİŞİ</h2>
-
-  <div style="margin-bottom: 15px;">
-    <p style="margin: 5px 0;"><strong>Bina Adı:</strong> {{BUILDING_NAME}}</p>
-    <p style="margin: 5px 0;"><strong>Bina Adresi:</strong> {{BUILDING_ADDRESS}}</p>
-    <p style="margin: 5px 0;"><strong>Asansör Sayısı:</strong> {{ELEVATOR_COUNT}}</p>
-  </div>
-
-  <div style="margin-bottom: 15px;">
-    <p style="margin: 5px 0;"><strong>Bakım Tarihi:</strong> {{DATE}}</p>
-    <p style="margin: 5px 0;"><strong>Bakım Saati:</strong> {{TIMESTAMP}}</p>
-    <p style="margin: 5px 0;"><strong>Teknisyen:</strong> {{TECHNICIAN}}</p>
-  </div>
-
-  <div style="margin-bottom: 15px;">
-    <p style="margin: 5px 0;"><strong>Yapılan İşlem:</strong> {{MAINTENANCE_ACTION}}</p>
-    <p style="margin: 5px 0;"><strong>Notlar:</strong> {{NOTES}}</p>
-  </div>
-
-  {{PARTS_SECTION}}
-
-  {{DEBT_SECTION}}
-
-  <div style="text-align: right; margin-top: 20px; padding-top: 10px; border-top: 1px solid #eee;">
-    <p style="font-size: 18px; font-weight: bold; margin: 5px 0;">Toplam Ücret: {{TOTAL_AMOUNT}}</p>
-  </div>
-
-  <div style="text-align: center; margin-top: 30px; font-size: 12px; color: #999;">
-    <p>Bu fiş, yapılan bakım hizmetinin belgesidir.</p>
-  </div>
-</div>`,
+    receiptTemplate: state.settings?.receiptTemplate ?? ``, // Boş string ile başlatıldı, AppContext'ten doldurulacak
     installationProposalTemplate: state.settings?.installationProposalTemplate ?? '',
     maintenanceProposalTemplate: state.settings?.maintenanceProposalTemplate ?? '',
     revisionProposalTemplate: state.settings?.revisionProposalTemplate ?? '',
     faultReportTemplate: state.settings?.faultReportTemplate ?? ''
   });
+  useEffect(() => { // templates state'ini global settings ile senkronize etmek için
+    setTemplates({
+      receiptTemplate: state.settings?.receiptTemplate ?? '',
+      installationProposalTemplate: state.settings?.installationProposalTemplate ?? '',
+      maintenanceProposalTemplate: state.settings?.maintenanceProposalTemplate ?? '',
+      revisionProposalTemplate: state.settings?.revisionProposalTemplate ?? '',
+      faultReportTemplate: state.settings?.faultReportTemplate ?? ''
+    });
+  }, [state.settings]);
   
   const [proposalTemplateForm, setProposalTemplateForm] = useState({
     type: 'installation' as 'installation' | 'maintenance' | 'revision',
@@ -100,15 +110,18 @@ const SettingsPage: React.FC = () => {
   const handleTemplatesSave = () => {
     updateSettings(templates);
     setEditingTemplates(null);
+    addNotification('Şablon ayarları başarıyla kaydedildi!'); // Bildirim ekle
   };
 
   const handleDeleteUser = (userId: string) => {
     if (userId === state.currentUser?.id) {
-      alert('Aktif kullanıcı silinemez!');
+      // alert('Aktif kullanıcı silinemez!'); // alert yerine custom modal kullanılmalı
+      addNotification('Aktif kullanıcı silinemez!');
       return;
     }
     deleteUser(userId);
     setShowDeleteConfirm(null);
+    addNotification('Kullanıcı başarıyla silindi!'); // Bildirim ekle
   };
 
   const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -118,6 +131,7 @@ const SettingsPage: React.FC = () => {
       reader.onloadend = () => {
         const base64String = reader.result as string;
         updateSettings({ logo: base64String });
+        addNotification('Logo başarıyla yüklendi!'); // Bildirim ekle
       };
       reader.readAsDataURL(file);
     }
@@ -133,10 +147,12 @@ const SettingsPage: React.FC = () => {
           ...prev,
           documentFile: base64String
         }));
+        addNotification('Belge başarıyla yüklendi!'); // Bildirim ekle
       };
       reader.readAsDataURL(file);
     } else {
-      alert('Lütfen sadece Word (.docx, .doc) veya PDF dosyası yükleyin.');
+      // alert('Lütfen sadece Word (.docx, .doc) veya PDF dosyası yükleyin.'); // alert yerine custom modal kullanılmalı
+      addNotification('Lütfen sadece Word (.docx, .doc) veya PDF dosyası yükleyin.');
     }
   };
 
@@ -218,9 +234,11 @@ const SettingsPage: React.FC = () => {
     e.preventDefault();
     if (editingProposalTemplate) {
       updateProposalTemplate({ ...proposalTemplateForm, id: editingProposalTemplate });
+      addNotification('Teklif şablonu başarıyla güncellendi!'); // Bildirim ekle
       setEditingProposalTemplate(null);
     } else {
       addProposalTemplate(proposalTemplateForm);
+      addNotification('Yeni teklif şablonu başarıyla eklendi!'); // Bildirim ekle
     }
     setProposalTemplateForm({
       type: 'installation',
@@ -247,8 +265,8 @@ const SettingsPage: React.FC = () => {
   };
   
   return (
-    <div className="p-4 md:p-6">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Ayarlar</h1>
+    <div className="p-4 md:p-6 bg-gray-50 min-h-screen">
+      <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-6">Uygulama Ayarları</h1>
       
       <div className="grid grid-cols-1 gap-6">
         <div className="bg-white shadow rounded-lg overflow-hidden">
@@ -522,8 +540,8 @@ const SettingsPage: React.FC = () => {
                       <div>{'{{COMPANY_NAME}}'} - Firma adı</div>
                       <div>{'{{COMPANY_ADDRESS}}'} - Firma adresi</div>
                       <div>{'{{COMPANY_PHONE}}'} - Firma telefonu</div>
-                      <div>{'{{CE_EMBLEM}}'} - {{CE_EMBLEM}}</div>
-                      <div>{'{{TSE_EMBLEM}}'} - {{TSE_EMBLEM}}</div>
+                      <div>{'{{CE_EMBLEM}}'} - {'{{CE_EMBLEM}}'}</div> {/* Değişiklik burada */}
+                      <div>{'{{TSE_EMBLEM}}'} - {'{{TSE_EMBLEM}}'}</div> {/* Değişiklik burada */}
                       <div>{'{{DATE}}'} - Tarih</div>
                       <div>{'{{BUILDING_NAME}}'} - Bina adı</div>
                       <div>{'{{BUILDING_ADDRESS}}'} - Bina adresi</div>
