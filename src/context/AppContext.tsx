@@ -1820,3 +1820,139 @@ export const useApp = () => {
   }
   return context;
 }
+import React, { useState } from 'react';
+import { useApp } from '../context/AppContext'; // AppContext.tsx'den useApp hook'unu import ettiğinizi varsayıyorum.
+// Eğer useApp hook'unuz yoksa, useContext(AppContext) kullanarak dispatch ve state'e erişebilirsiniz.
+
+const BuildingsPage: React.FC = () => {
+  // useApp hook'undan state ve dispatch fonksiyonunu alıyoruz.
+  // AppContext.tsx içinde bu fonksiyonları dispatch'i sarmalayarak export etmelisiniz.
+  // Örneğin: const markMaintenanceDone = (buildingId: string, showReceipt: boolean) => dispatch({ type: 'MARK_MAINTENANCE_DONE', payload: { buildingId, showReceipt } });
+  // Bu örnekte doğrudan dispatch kullanacağım.
+  const { state, dispatch } = useApp();
+
+  // Hangi bina için bakım seçenekleri modalının açık olduğunu tutan state
+  // null ise kapalı, bina ID'si ise o bina için açık.
+  const [showMaintenanceOptionsForBuildingId, setShowMaintenanceOptionsForBuildingId] = useState<string | null>(null);
+
+  // Bakım seçenekleri modalı için seçilen bina
+  const selectedBuilding = state.buildings.find(b => b.id === showMaintenanceOptionsForBuildingId);
+
+  // "Bakım Yapıldı" butonuna tıklandığında çalışacak ana fonksiyon
+  const handleMaintenanceButtonClick = (buildingId: string) => {
+    const building = state.buildings.find(b => b.id === buildingId);
+    if (!building) return;
+
+    if (building.isMaintained) {
+      // Eğer bina zaten bakımlıysa, seçenekler modalını aç
+      setShowMaintenanceOptionsForBuildingId(buildingId);
+    } else {
+      // Eğer bina bakımlı değilse, doğrudan bakımı işaretle ve fiş göster
+      dispatch({ type: 'MARK_MAINTENANCE_DONE', payload: { buildingId, showReceipt: true } });
+    }
+  };
+
+  // "Bakımı İptal Et" butonuna tıklandığında çalışacak fonksiyon
+  const handleUndoMaintenance = (buildingId: string) => {
+    dispatch({ type: 'UNDO_MAINTENANCE', payload: buildingId });
+    setShowMaintenanceOptionsForBuildingId(null); // Modalı kapat
+  };
+
+  // "Bakım Fişini Görüntüle" butonuna tıklandığında çalışacak fonksiyon
+  const handleViewLastMaintenanceReceipt = (buildingId: string) => {
+    // Bu bina için en son arşivlenmiş makbuzu bul (bu mantık AppContext'te zaten var, sadece ID'yi bulmalıyız)
+    const latestReceiptForBuilding = state.archivedReceipts
+        .filter(ar => ar.buildingId === buildingId)
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+
+    if (latestReceiptForBuilding) {
+        // En son makbuzun ID'sini göndererek modalı aç
+        dispatch({ type: 'VIEW_ARCHIVED_RECEIPT', payload: latestReceiptForBuilding.id });
+    } else {
+        alert('Bu bina için arşivlenmiş bakım fişi bulunamadı.'); // Kullanıcıya bilgi ver
+    }
+    setShowMaintenanceOptionsForBuildingId(null); // Bakım seçenekleri modalını kapat
+  };
+
+  return (
+    <div className="p-4">
+      <h1 className="text-2xl font-bold mb-4">Binalar</h1>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {state.buildings.map(building => (
+          <div key={building.id} className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-xl font-semibold mb-2">{building.name}</h2>
+            <p className="text-gray-600 mb-1">Adres: {building.address.mahalle}, {building.address.sokak}, {building.address.binaNo}, {building.address.ilce}/{building.address.il}</p>
+            <p className="text-gray-600 mb-1">Asansör Sayısı: {building.elevatorCount}</p>
+            <p className="text-gray-600 mb-1">Bakım Ücreti: {building.maintenanceFee} TL</p>
+            <p className="text-gray-600 mb-1">Güncel Borç: {building.debt.toFixed(2)} TL</p>
+            <p className={`font-bold ${building.isMaintained ? 'text-green-600' : 'text-red-600'}`}>
+              Bakım Durumu: {building.isMaintained ? 'Yapıldı' : 'Yapılmadı'}
+            </p>
+            {building.lastMaintenanceDate && (
+                <p className="text-gray-600 mb-2">Son Bakım: {building.lastMaintenanceDate} {building.lastMaintenanceTime}</p>
+            )}
+
+            <div className="mt-4 flex space-x-2">
+              <button
+                onClick={() => handleMaintenanceButtonClick(building.id)}
+                className={`px-4 py-2 rounded-md font-semibold transition-colors duration-200 
+                  ${building.isMaintained ? 'bg-orange-500 text-white hover:bg-orange-600' : 'bg-green-500 text-white hover:bg-green-600'}`}
+              >
+                {building.isMaintained ? 'Bakım Seçenekleri' : 'Bakım Yapıldı'}
+              </button>
+              {/* Diğer butonlar (Düzenle, Sil vb.) buraya eklenebilir */}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Bakım Seçenekleri Modalı */}
+      {showMaintenanceOptionsForBuildingId && selectedBuilding && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
+            <h3 className="text-xl font-bold mb-4 text-center">Bakım Seçenekleri: {selectedBuilding.name}</h3>
+            <p className="text-gray-700 text-center mb-6">Lütfen yapmak istediğiniz işlemi seçin.</p>
+            <div className="flex flex-col space-y-4">
+              <button
+                onClick={() => handleUndoMaintenance(showMaintenanceOptionsForBuildingId)}
+                className="bg-red-600 text-white px-6 py-3 rounded-lg text-lg font-semibold shadow-md hover:bg-red-700 transition-colors duration-200"
+              >
+                Bakımı İptal Et
+              </button>
+              <button
+                onClick={() => handleViewLastMaintenanceReceipt(showMaintenanceOptionsForBuildingId)}
+                className="bg-blue-600 text-white px-6 py-3 rounded-lg text-lg font-semibold shadow-md hover:bg-blue-700 transition-colors duration-200"
+              >
+                Bakım Fişini Görüntüle
+              </button>
+              <button
+                onClick={() => setShowMaintenanceOptionsForBuildingId(null)} // Modalı kapat
+                className="bg-gray-400 text-gray-900 px-6 py-3 rounded-lg text-lg font-semibold shadow-md hover:bg-gray-500 transition-colors duration-200"
+              >
+                İptal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Makbuz Gösterme Modalı (Bu AppContext'inizde zaten var, sadece HTML'i render etmeliyiz) */}
+      {state.showReceiptModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white p-6 rounded-lg shadow-lg max-w-2xl w-full h-[90vh] overflow-auto relative">
+                {/* Makbuz içeriğini güvenli bir şekilde render et */}
+                <div dangerouslySetInnerHTML={{ __html: state.receiptModalHtml || '' }} />
+                <button
+                    onClick={() => dispatch({ type: 'CLOSE_RECEIPT_MODAL' })}
+                    className="absolute top-4 right-4 bg-gray-500 text-white px-3 py-1 rounded-md hover:bg-gray-600 transition-colors duration-200"
+                >
+                    X Kapat
+                </button>
+            </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default BuildingsPage;
