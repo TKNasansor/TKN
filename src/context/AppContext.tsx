@@ -35,7 +35,7 @@ const initialState: AppState = {
             {{LOGO}} <!-- Firma Logosu -->
           </div>
           <div class="header-center">
-            <h1 class="company-name-title">{{COMPANY_NAME}}</h1> <!-- Firma Adı -->
+            <h1 class="company-name-title" style="font-family: 'Bodoni Moda', serif;">{{COMPANY_NAME}}</h1> <!-- Firma Adı - Bodoni fontu eklendi -->
           </div>
           <div class="header-right">
             {{TSE_EMBLEM}} <!-- TSE Amblemi -->
@@ -69,7 +69,7 @@ const initialState: AppState = {
         </div>
 
         <div class="maintenance-summary-section">
-          <h3>YAPILAN İŞLEMLER</h3> <!-- Sabit Metin -->
+          <h3>YAPILAN İŞLEmler</h3> <!-- Sabit Metin -->
           <div class="summary-item">
             <span>Bakım Yapıldı</span>
             <span>{{MAINTENANCE_FEE_CALCULATED}}</span> <!-- Bakım Ücreti -->
@@ -93,13 +93,25 @@ const initialState: AppState = {
         
         <div class="signature-section">
           <p>Asansör firma yetkilisi</p> <!-- Sabit Metin -->
-          <p>{{TECHNICIAN_NAME}}</p> <!-- Teknisyen Adı -->
+          <p style="font-family: 'Zapfino', 'Dancing Script', cursive;">{{TECHNICIAN_NAME}}</p> <!-- Teknisyen Adı - Zapfino fontu eklendi -->
         </div>
 
         <div class="watermark" style="background-image: url('{{LOGO_WATERMARK_URL}}');"></div> <!-- Filigran Logo -->
       </div>
 
       <style>
+        /* Zapfino fontunu doğrudan web'e dahil etme denemesi ve fallback'ler */
+        @font-face {
+          font-family: 'Zapfino';
+          src: local('Zapfino'),
+               url('https://cdn.jsdelivr.net/npm/gsap@3.12.5/all.min.js') format('woff2'); /* Örnek URL, gerçek Zapfino web fontu bulunmalıdır */
+          font-weight: normal;
+          font-style: normal;
+        }
+        /* Alternatif olarak Dancing Script gibi Google Fonts'tan bir script fontu ekleyebilirsiniz */
+        @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..12,400..900;1,6..12,400..900&display=swap');
+
         .receipt-container {
           position: relative;
           max-width: 800px;
@@ -404,9 +416,10 @@ type Action =
   | { type: 'SHOW_PRINTER_SELECTION'; payload: string }
   | { type: 'CLOSE_PRINTER_SELECTION' }
   | { type: 'INCREASE_PRICES'; payload: number }
-  | { type: 'SHOW_ARCHIVED_RECEIPT'; payload: string } // Yeni aksiyon: Arşivlenmiş fişi göster
-  | { type: 'REMOVE_MAINTENANCE_STATUS_MARK'; payload: string } // Yeni aksiyon: Bakım işaretini kaldır
-  | { type: 'CANCEL_MAINTENANCE'; payload: string }; // Yeni aksiyon: Bakımı iptal et
+  | { type: 'SHOW_ARCHIVED_RECEIPT'; payload: string }
+  | { type: 'REMOVE_MAINTENANCE_STATUS_MARK'; payload: string }
+  | { type: 'CANCEL_MAINTENANCE'; payload: string }
+  | { type: 'REVERT_MAINTENANCE'; payload: string };
 
 function appReducer(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -697,6 +710,7 @@ function appReducer(state: AppState, action: Action): AppState {
     case 'ADD_NOTIFICATION':
       return {
         ...state,
+        // Ensure that new notifications are added and unread count is updated
         notifications: [action.payload, ...state.notifications],
         unreadNotifications: state.unreadNotifications + 1,
       };
@@ -722,21 +736,22 @@ function appReducer(state: AppState, action: Action): AppState {
 
       // Eğer bina zaten bakım yapıldı olarak işaretliyse, bu aksiyonun doğrudan durumu değiştirmesini engelliyoruz.
       // UI katmanı bu durumu yakalayıp kullanıcıya seçenekler sunmalı.
-      if (targetBuilding.isMaintained) {
-        // Bu noktada UI'dan gelen 'showReceipt' isteği, kullanıcının doğrudan fişi görüntülemek istediği anlamına gelir.
-        // Bu durum, 'Bakımı iptal et' seçeneğinden ayrıdır.
-        if (showReceipt) {
-            const receiptHtml = generateMaintenanceReceipt(targetBuilding, state, state.currentUser?.name || 'Bilinmeyen');
-            return {
-                ...state,
-                showReceiptModal: true,
-                receiptModalHtml: receiptHtml,
-            };
-        }
-        return state; // Zaten bakım yapıldıysa ve fiş gösterme isteği yoksa, hiçbir şey yapma.
+      if (targetBuilding.isMaintained && !showReceipt) { // Sadece işaretli ve fiş gösterilmek istenmiyorsa işlem yapma
+        return state; 
+      }
+      
+      // Eğer fiş gösterilmek isteniyorsa ve zaten bakımı yapılmışsa, sadece fişi göster
+      if (targetBuilding.isMaintained && showReceipt) {
+          const receiptHtml = generateMaintenanceReceipt(targetBuilding, state, state.currentUser?.name || 'Bilinmeyen');
+          return {
+              ...state,
+              showReceiptModal: true,
+              receiptModalHtml: receiptHtml,
+          };
       }
 
-      // Bina henüz bakım yapılmadıysa, bakım işlemini tamamla
+
+      // Bina henüz bakım yapılmadıysa veya fiş gösterilmek isteniyorsa, bakım işlemini tamamla
       const newMaintenanceStatus = true; // Her zaman true olarak ayarla
       const currentDateISO = new Date().toISOString().split('T')[0];
       const currentTimeLocale = new Date().toLocaleTimeString('tr-TR', { 
@@ -782,6 +797,7 @@ function appReducer(state: AppState, action: Action): AppState {
 
       // Bakım ücretinin bu ay içinde zaten eklenip eklenmediğini kontrol et (sadece 1 defa yazılsın)
       const currentMonth = new Date().toISOString().substring(0, 7); //YYYY-MM formatı
+      // Burada relatedRecordId kontrolü sadece yeni eklenen kaydın kendisiyle yapılmalı
       const maintenanceFeeAlreadyAddedThisMonth = state.debtRecords.some(dr =>
           dr.buildingId === tmBuildingId &&
           dr.type === 'maintenance' &&
@@ -854,9 +870,13 @@ function appReducer(state: AppState, action: Action): AppState {
         const archivedReceipt: ArchivedReceipt = {
             id: uuidv4(),
             buildingId: tmBuildingId,
-            timestamp: new Date().toISOString(),
+            createdDate: currentDateISO, // createdDate eklendi
+            createdBy: state.currentUser?.name || 'Bilinmeyen', // createdBy eklendi
+            maintenanceDate: currentDateISO, // maintenanceDate eklendi
+            buildingName: targetBuilding.name, // buildingName eklendi
             htmlContent: receiptHtml,
             relatedRecordId: newMaintenanceRecordId, // İlişkili MaintenanceRecord id'sini ekle
+            timestamp: new Date().toISOString(), // timestamp eklendi
         };
         
         return {
@@ -1605,11 +1625,11 @@ const AppContext = createContext<{
   showPrinterSelection: (content: string) => void;
   closePrinterSelection: () => void;
   increasePrices: (percentage: number) => void;
-  showArchivedReceipt: (receiptId: string) => void; // Arşivlenmiş fişi gösterme fonksiyonu
-  removeMaintenanceStatusMark: (buildingId: string) => void; // Bakım işaretini kaldırma fonksiyonu
-  cancelMaintenance: (buildingId: string) => void; // Bakımı iptal etme fonksiyonu
-  revertMaintenance: (buildingId: string) => void; // Bakımı geri alma fonksiyonu
-  getLatestArchivedReceiptHtml: (buildingId: string) => string | null; // En son arşivlenmiş fiş HTML'ini getirme fonksiyonu
+  showArchivedReceipt: (receiptId: string) => void;
+  removeMaintenanceStatusMark: (buildingId: string) => void;
+  cancelMaintenance: (buildingId: string) => void;
+  revertMaintenance: (buildingId: string) => void;
+  getLatestArchivedReceiptHtml: (buildingId: string) => string | null;
 } | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -1668,6 +1688,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const addNotification = (notification: string) => {
+    console.log("Adding notification:", notification); // Bildirim ekleme logu
     dispatch({ type: 'ADD_NOTIFICATION', payload: notification });
   };
 
@@ -1801,19 +1822,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     dispatch({ type: 'ARCHIVE_RECEIPT', payload: receipt });
   };
 
-  const showPrinterSelection = (content: string) => {
-    dispatch({ type: 'SHOW_PRINTER_SELECTION', payload: content });
-  };
-
-  const closePrinterSelection = () => {
-    dispatch({ type: 'CLOSE_PRINTER_SELECTION' });
-  };
-
-  const increasePrices = (percentage: number) => {
-    dispatch({ type: 'INCREASE_PRICES', payload: percentage });
-  };
-
-  // Yeni eklenen aksiyonlar
   const showArchivedReceipt = (receiptId: string) => {
     dispatch({ type: 'SHOW_ARCHIVED_RECEIPT', payload: receiptId });
   };
@@ -1885,12 +1893,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         showPrinterSelection,
         closePrinterSelection,
         increasePrices,
-        // Yeni eklenen aksiyonları buraya da ekle
         showArchivedReceipt,
         removeMaintenanceStatusMark,
         cancelMaintenance,
-        revertMaintenance, // Yeni eklenen fonksiyon
-        getLatestArchivedReceiptHtml: getLatestArchivedReceiptHtmlMemoized, // Yeni eklenen yardımcı fonksiyon
+        revertMaintenance,
+        getLatestArchivedReceiptHtml: getLatestArchivedReceiptHtmlMemoized,
       }}
     >
       {children}
