@@ -406,7 +406,8 @@ type Action =
   | { type: 'INCREASE_PRICES'; payload: number }
   | { type: 'SHOW_ARCHIVED_RECEIPT'; payload: string } // Yeni aksiyon: Arşivlenmiş fişi göster
   | { type: 'REMOVE_MAINTENANCE_STATUS_MARK'; payload: string } // Yeni aksiyon: Bakım işaretini kaldır
-  | { type: 'CANCEL_MAINTENANCE'; payload: string }; // Yeni aksiyon: Bakımı iptal et
+  | { type: 'CANCEL_MAINTENANCE'; payload: string }
+  | { type: 'REVERT_MAINTENANCE'; payload: string }; // Yeni aksiyon: Bakımı geri al
 
 function appReducer(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -414,7 +415,7 @@ function appReducer(state: AppState, action: Action): AppState {
       const newBuilding: Building = {
         ...action.payload,
         id: uuidv4(),
-        maintenanceNote: '', // Yeni eklenen alan: bakım notu
+        maintenanceNote: '', // Yeni eklenen alan: Bakım notu
       };
       return {
         ...state,
@@ -695,9 +696,11 @@ function appReducer(state: AppState, action: Action): AppState {
       };
 
     case 'ADD_NOTIFICATION':
+      const newNotification = action.payload; // Bildirimin kendisini al
+      console.log('Bildirim eklendi:', newNotification, 'Mevcut bildirimler:', state.notifications); // Konsol logu eklendi
       return {
         ...state,
-        notifications: [action.payload, ...state.notifications],
+        notifications: [newNotification, ...state.notifications],
         unreadNotifications: state.unreadNotifications + 1,
       };
 
@@ -1668,6 +1671,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const addNotification = (notification: string) => {
+    console.log("Adding notification (AppProvider):", notification); // addNotification içinde log
     dispatch({ type: 'ADD_NOTIFICATION', payload: notification });
   };
 
