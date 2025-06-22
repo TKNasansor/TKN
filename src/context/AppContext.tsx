@@ -891,87 +891,38 @@ function appReducer(state: AppState, action: Action): AppState {
       }
       return finalStateAfterMaintenance;
 
+    // REPORT_FAULT ve ADD_FAULT_REPORT caselerinden Firebase çağrıları kaldırıldı.
+    // Bu mantık, aşağıda tanımlanan `reportFault` ve `addFaultReport` fonksiyonlarına taşındı.
     case 'REPORT_FAULT':
-      const { buildingId: faultBuildingId, faultData } = action.payload;
-      const faultBuilding = state.buildings.find(b => b.id === faultBuildingId);
-      
-      if (!faultBuilding) return state;
+      const faultBuildingReport = state.buildings.find(b => b.id === action.payload.buildingId);
+      if (!faultBuildingReport) return state;
 
-      const updatedBuildingsForFault = state.buildings.map(b =>
-        b.id === faultBuildingId
+      const updatedBuildingsForFaultReport = state.buildings.map(b =>
+        b.id === action.payload.buildingId
           ? {
               ...b,
               isDefective: true,
-              defectiveNote: faultData.description,
-              faultSeverity: faultData.severity,
+              defectiveNote: action.payload.faultData.description,
+              faultSeverity: action.payload.faultData.severity,
               faultTimestamp: new Date().toISOString(),
-              faultReportedBy: faultData.reportedBy,
+              faultReportedBy: action.payload.faultData.reportedBy,
             }
           : b
       );
 
-      const notificationMessage = `${faultBuilding.name} binasında arıza bildirildi (${faultData.severity === 'high' ? 'Yüksek' : faultData.severity === 'medium' ? 'Orta' : 'Düşük'} öncelik)`;
-      
-      // Firestore'a bildirim ekleme
-      if (db && state.currentUser?.uid) {
-        const notificationsCollectionRef = collection(db, `artifacts/${__app_id}/users/${state.currentUser.uid}/notifications`);
-        addDoc(notificationsCollectionRef, {
-          message: notificationMessage,
-          timestamp: new Date().toISOString(),
-          type: 'error', // Assuming fault reports are 'error' type
-          severity: faultData.severity,
-          actionRequired: true,
-          relatedId: faultBuildingId,
-          userId: state.currentUser.uid,
-        }).catch(error => {
-          console.error("Error adding fault report notification to Firestore:", error);
-          // Hata durumunda sistem bildirimi gönder
-          dispatch({ 
-            type: 'ADD_SYSTEM_NOTIFICATION', 
-            payload: { 
-              id: uuidv4(),
-              message: `Arıza bildirimi Firestore'a kaydedilirken hata oluştu: ${error.message}`, 
-              timestamp: new Date().toISOString(), 
-              type: 'error', 
-              severity: 'high', 
-              actionRequired: true, 
-              relatedId: faultBuildingId,
-              userId: state.currentUser?.uid || 'unknown'
-            } 
-          });
-        });
-      } else {
-        console.warn("Firestore not ready or user not authenticated to add fault report notification.");
-        // Firestore hazır değilse veya kullanıcı doğrulanmamışsa sistem bildirimi gönder
-        dispatch({ 
-          type: 'ADD_SYSTEM_NOTIFICATION', 
-          payload: { 
-            id: uuidv4(),
-            message: "Firebase başlatılamadı veya kullanıcı doğrulanmadı. Arıza bildirimi kaydedilemedi.", 
-            timestamp: new Date().toISOString(), 
-            type: 'error', 
-            severity: 'high', 
-            actionRequired: true,
-            userId: state.currentUser?.uid || 'unknown'
-          } 
-        });
-      }
-
       return {
         ...state,
-        buildings: updatedBuildingsForFault,
+        buildings: updatedBuildingsForFaultReport,
         updates: [
           {
             id: uuidv4(),
             action: 'Arıza Bildirildi',
             user: state.currentUser?.name || 'Bilinmeyen',
             timestamp: new Date().toISOString(),
-            details: `${faultBuilding.name} binası arızalı olarak işaretlendi. Bildiren: ${faultData.reportedBy}`,
+            details: `${faultBuildingReport.name} binası arızalı olarak işaretlendi. Bildiren: ${action.payload.faultData.reportedBy}`,
           },
           ...state.updates,
         ],
-        // notifications ve unreadNotifications şimdi Firestore listener tarafından güncellenecek.
-        // Bu yüzden doğrudan burada güncellemiyoruz.
       };
 
     case 'UPDATE_SETTINGS':
@@ -1012,56 +963,9 @@ function appReducer(state: AppState, action: Action): AppState {
         timestamp: new Date().toISOString(),
         status: 'pending',
       };
-
-      // Firestore'a bildirim ekleme (örnek: arıza bildirimleri için)
-      if (db && state.currentUser?.uid) {
-        const notificationsCollectionRef = collection(db, `artifacts/${__app_id}/users/${state.currentUser.uid}/notifications`);
-        addDoc(notificationsCollectionRef, {
-          message: `Yeni arıza bildirimi: ${action.payload.reporterName} ${action.payload.reporterSurname}`,
-          timestamp: new Date().toISOString(),
-          type: 'info', // Adjust type as necessary
-          severity: 'high', // Assuming fault reports are high priority
-          actionRequired: true,
-          relatedId: action.payload.buildingId,
-          userId: state.currentUser.uid,
-        }).catch(error => {
-          console.error("Error adding fault report (from form) notification to Firestore:", error);
-          // Hata durumunda sistem bildirimi gönder
-          dispatch({ 
-            type: 'ADD_SYSTEM_NOTIFICATION', 
-            payload: { 
-              id: uuidv4(),
-              message: `Formdan arıza bildirimi kaydedilirken hata oluştu: ${error.message}`, 
-              timestamp: new Date().toISOString(), 
-              type: 'error', 
-              severity: 'high', 
-              actionRequired: true, 
-              relatedId: action.payload.buildingId,
-              userId: state.currentUser?.uid || 'unknown'
-            } 
-          });
-        });
-      } else {
-        console.warn("Firestore not ready or user not authenticated to add fault report (from form) notification.");
-        // Firestore hazır değilse veya kullanıcı doğrulanmamışsa sistem bildirimi gönder
-        dispatch({ 
-          type: 'ADD_SYSTEM_NOTIFICATION', 
-          payload: { 
-            id: uuidv4(),
-            message: "Firebase başlatılamadı veya kullanıcı doğrulanmadı. Arıza formu kaydedilemedi.", 
-            timestamp: new Date().toISOString(), 
-            type: 'error', 
-            severity: 'high', 
-            actionRequired: true,
-            userId: state.currentUser?.uid || 'unknown'
-          } 
-        });
-      }
-
       return {
         ...state,
         faultReports: [...state.faultReports, faultReport],
-        // notifications ve unreadNotifications şimdi Firestore listener tarafından güncellenecek.
       };
 
     case 'RESOLVE_FAULT_REPORT':
@@ -1657,14 +1561,14 @@ const AppContext = createContext<{
   addIncome: (income: Omit<Income, 'id'>) => void;
   setUser: (name: string) => void;
   deleteUser: (id: string) => void;
-  addNotification: (notification: AppNotificationData) => void; // Updated to take NotificationData
-  clearNotifications: () => void;
+  addNotification: (notification: AppNotificationData) => Promise<void>; // Updated to return Promise<void>
+  clearNotifications: () => Promise<void>; // Updated to return Promise<void>
   toggleSidebar: () => void;
   toggleMaintenance: (buildingId: string, showReceipt?: boolean) => void;
-  reportFault: (buildingId: string, faultData: { description: string; severity: 'low' | 'medium' | 'high'; reportedBy: string }) => void;
+  reportFault: (buildingId: string, faultData: { description: string; severity: 'low' | 'medium' | 'high'; reportedBy: string }) => Promise<void>; // Updated to return Promise<void>
   updateSettings: (settings: Partial<AppState['settings']>) => void;
   resetMaintenanceStatus: () => void;
-  addFaultReport: (buildingId: string, reporterName: string, reporterSurname: string, reporterPhone: string, apartmentNo: string, description: string) => void;
+  addFaultReport: (buildingId: string, reporterName: string, reporterSurname: string, reporterPhone: string, apartmentNo: string, description: string) => Promise<void>; // Updated to return Promise<void>
   resolveFaultReport: (id: string) => void;
   addMaintenanceHistory: (history: Omit<MaintenanceHistory, 'id'>) => void;
   addMaintenanceRecord: (record: Omit<MaintenanceRecord, 'id'>) => void;
@@ -1868,7 +1772,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           userId: userId, // Ensure userId is set
         });
         console.log("Notification added to Firestore:", notification.message);
-      } catch (error) {
+      } catch (error: any) { // Hata tipini 'any' olarak belirttik
         console.error("Error adding notification to Firestore:", error);
         addSystemNotification({
           id: uuidv4(),
@@ -1882,7 +1786,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
     } else {
       console.warn("Firestore not ready or user not authenticated to add notification.");
-      // Optionally, dispatch to local state if Firestore is not available, but it won't persist.
+      // Firestore hazır değilse veya kullanıcı doğrulanmamışsa lokal bildirim gönder
       addSystemNotification({
         id: uuidv4(),
         message: "Firebase veya kullanıcı kimlik doğrulaması hazır değil. Bildirim kalıcı olarak kaydedilemedi.",
@@ -1892,6 +1796,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         actionRequired: false,
         userId: state.currentUser?.uid || 'system'
       });
+      // Sadece lokal duruma ekle, kalıcı olmayacak
       dispatch({ type: 'ADD_NOTIFICATION_LOCAL', payload: notification });
     }
   };
@@ -1913,7 +1818,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
         console.log("Notifications cleared from Firestore.");
         dispatch({ type: 'CLEAR_NOTIFICATIONS' }); // Clear local state after DB is cleared
-      } catch (error) {
+      } catch (error: any) { // Hata tipini 'any' olarak belirttik
         console.error("Error clearing notifications from Firestore:", error);
         addSystemNotification({
           id: uuidv4(),
@@ -1948,8 +1853,66 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     dispatch({ type: 'TOGGLE_MAINTENANCE', payload: { buildingId, showReceipt } });
   };
 
-  const reportFault = (buildingId: string, faultData: { description: string; severity: 'low' | 'medium' | 'high'; reportedBy: string }) => {
+  // reportFault fonksiyonu güncellendi: Firestore işlemleri buraya taşındı
+  const reportFault = async (buildingId: string, faultData: { description: string; severity: 'low' | 'medium' | 'high'; reportedBy: string }) => {
+    // Reducer'ı lokal state güncellemesi için çağır
     dispatch({ type: 'REPORT_FAULT', payload: { buildingId, faultData } });
+
+    const faultBuilding = state.buildings.find(b => b.id === buildingId);
+    if (!faultBuilding) {
+        addSystemNotification({
+            id: uuidv4(),
+            message: `Arıza bildirimi yapılamadı: Bina bulunamadı (ID: ${buildingId}).`,
+            timestamp: new Date().toISOString(),
+            type: 'error',
+            severity: 'medium',
+            actionRequired: false,
+            userId: state.currentUser?.uid || 'system'
+        });
+        return;
+    }
+
+    const notificationMessage = `${faultBuilding.name} binasında arıza bildirildi (${faultData.severity === 'high' ? 'Yüksek' : faultData.severity === 'medium' ? 'Orta' : 'Düşük'} öncelik)`;
+    
+    // Firestore'a bildirim ekleme
+    if (db && authReady.current && auth.currentUser) {
+      try {
+        const notificationsCollectionRef = collection(db, `artifacts/${__app_id}/users/${auth.currentUser.uid}/notifications`);
+        await addDoc(notificationsCollectionRef, {
+          message: notificationMessage,
+          timestamp: new Date().toISOString(),
+          type: 'error', // Assuming fault reports are 'error' type
+          severity: faultData.severity,
+          actionRequired: true,
+          relatedId: buildingId,
+          userId: auth.currentUser.uid,
+        });
+        console.log("Arıza bildirimi Firestore'a başarıyla eklendi.");
+      } catch (error: any) {
+        console.error("Arıza bildirimi Firestore'a eklenirken hata oluştu:", error);
+        addSystemNotification({
+          id: uuidv4(),
+          message: `Arıza bildirimi Firestore'a kaydedilirken hata oluştu: ${error.message}`,
+          timestamp: new Date().toISOString(),
+          type: 'error',
+          severity: 'high',
+          actionRequired: true,
+          relatedId: buildingId,
+          userId: auth.currentUser?.uid || 'unknown'
+        });
+      }
+    } else {
+      console.warn("Firestore hazır değil veya kullanıcı kimlik doğrulanmadı. Arıza bildirimi Firestore'a kaydedilemedi.");
+      addSystemNotification({
+        id: uuidv4(),
+        message: "Firebase başlatılamadı veya kullanıcı doğrulanmadı. Arıza bildirimi kalıcı olarak kaydedilemedi.",
+        timestamp: new Date().toISOString(),
+        type: 'error',
+        severity: 'high',
+        actionRequired: true,
+        userId: state.currentUser?.uid || 'unknown'
+      });
+    }
   };
 
   const updateSettings = (settings: Partial<AppState['settings']>) => {
@@ -1960,7 +1923,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     dispatch({ type: 'RESET_MAINTENANCE_STATUS' });
   };
 
-  const addFaultReport = (buildingId: string, reporterName: string, reporterSurname: string, reporterPhone: string, apartmentNo: string, description: string) => {
+  // addFaultReport fonksiyonu güncellendi: Firestore işlemleri buraya taşındı
+  const addFaultReport = async (buildingId: string, reporterName: string, reporterSurname: string, reporterPhone: string, apartmentNo: string, description: string) => {
+    // Reducer'ı lokal state güncellemesi için çağır
     dispatch({ 
       type: 'ADD_FAULT_REPORT', 
       payload: { 
@@ -1972,6 +1937,46 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         description 
       } 
     });
+
+    // Firestore'a bildirim ekleme (örnek: arıza bildirimleri için)
+    if (db && authReady.current && auth.currentUser) {
+      try {
+        const notificationsCollectionRef = collection(db, `artifacts/${__app_id}/users/${auth.currentUser.uid}/notifications`);
+        await addDoc(notificationsCollectionRef, {
+          message: `Yeni arıza bildirimi: ${reporterName} ${reporterSurname} (${buildingId})`,
+          timestamp: new Date().toISOString(),
+          type: 'info', // Adjust type as necessary
+          severity: 'high', // Assuming fault reports are high priority
+          actionRequired: true,
+          relatedId: buildingId,
+          userId: auth.currentUser.uid,
+        });
+        console.log("Formdan arıza bildirimi Firestore'a başarıyla eklendi.");
+      } catch (error: any) {
+        console.error("Formdan arıza bildirimi Firestore'a eklenirken hata oluştu:", error);
+        addSystemNotification({ 
+          id: uuidv4(),
+          message: `Formdan arıza bildirimi kaydedilirken hata oluştu: ${error.message}`, 
+          timestamp: new Date().toISOString(), 
+          type: 'error', 
+          severity: 'high', 
+          actionRequired: true, 
+          relatedId: buildingId,
+          userId: auth.currentUser?.uid || 'unknown'
+        });
+      }
+    } else {
+      console.warn("Firestore hazır değil veya kullanıcı kimlik doğrulanmadı. Arıza formu Firestore'a kaydedilemedi.");
+      addSystemNotification({ 
+        id: uuidv4(),
+        message: "Firebase başlatılamadı veya kullanıcı doğrulanmadı. Arıza formu kalıcı olarak kaydedilemedi.", 
+        timestamp: new Date().toISOString(), 
+        type: 'error', 
+        severity: 'high', 
+        actionRequired: true,
+        userId: state.currentUser?.uid || 'unknown'
+      });
+    }
   };
 
   const resolveFaultReport = (id: string) => {
@@ -2119,10 +2124,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         clearNotifications,
         toggleSidebar,
         toggleMaintenance,
-        reportFault,
+        reportFault, // Güncellenen fonksiyon
         updateSettings,
         resetMaintenanceStatus,
-        addFaultReport,
+        addFaultReport, // Güncellenen fonksiyon
         resolveFaultReport,
         addMaintenanceHistory,
         addMaintenanceRecord,
