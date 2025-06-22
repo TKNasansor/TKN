@@ -2,86 +2,6 @@ import React, { createContext, useContext, useReducer, ReactNode } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { AppState, Building, Part, PartInstallation, ManualPartInstallation, Update, Income, User, DebtRecord, FaultReport, MaintenanceHistory, MaintenanceRecord, Printer, SMSTemplate, Proposal, Payment, ProposalTemplate, QRCodeData, AutoSaveData, ArchivedReceipt } from '../types';
 
-// Bu kısım dışarıdan geldiği varsayılan bir helper fonksiyonudur.
-// Normalde bu dosya içinde tanımlı olmaz veya başka bir util dosyasından import edilir.
-// Eğer yoksa, bu reducer içinde basit bir versiyonu oluşturulabilir.
-// Örnek:
-const generateMaintenanceReceipt = (building: Building, state: AppState, technicianName: string): string => {
-    let receiptHtml = state.settings.receiptTemplate;
-
-    // Dinamik bilgileri doldur
-    receiptHtml = receiptHtml.replace(/{{COMPANY_NAME}}/g, state.settings.companyName || '');
-    receiptHtml = receiptHtml.replace(/{{COMPANY_PHONE}}/g, state.settings.companyPhone || '');
-    receiptHtml = receiptHtml.replace(/{{COMPANY_ADDRESS}}/g, 
-        `${state.settings.companyAddress.mahalle} ${state.settings.companyAddress.sokak}, ` +
-        `${state.settings.companyAddress.binaNo}, ${state.settings.companyAddress.ilce}/` +
-        `${state.settings.companyAddress.il}` || '');
-    receiptHtml = receiptHtml.replace(/{{DATE}}/g, new Date().toLocaleDateString('tr-TR'));
-    receiptHtml = receiptHtml.replace(/{{BUILDING_NAME}}/g, building.name || '');
-    receiptHtml = receiptHtml.replace(/{{TECHNICIAN_NAME}}/g, technicianName || 'Bilinmeyen');
-
-    // Logo ve Amblemler
-    receiptHtml = receiptHtml.replace(/{{LOGO}}/g, state.settings.logo ? `<img src="${state.settings.logo}" alt="Company Logo" class="logo" />` : '');
-    receiptHtml = receiptHtml.replace(/{{TSE_EMBLEM}}/g, state.settings.tseEmblemUrl ? `<img src="${state.settings.tseEmblemUrl}" alt="TSE Emblem" />` : '');
-    receiptHtml = receiptHtml.replace(/{{CE_EMBLEM}}/g, state.settings.ceEmblemUrl ? `<img src="${state.settings.ceEmblemUrl}" alt="CE Emblem" />` : '');
-    receiptHtml = receiptHtml.replace(/{{LOGO_WATERMARK_URL}}/g, state.settings.logo || ''); // Filigran için logo URL'si
-
-    // Bakım Notu Bölümü (opsiyonel)
-    const maintenanceNoteSection = building.maintenanceNote ? `
-        <div class="maintenance-note-section">
-            <h3>BAKIM NOTU</h3>
-            <p>${building.maintenanceNote}</p>
-        </div>
-    ` : '';
-    receiptHtml = receiptHtml.replace(/{{MAINTENANCE_NOTE_SECTION}}/g, maintenanceNoteSection);
-
-    // Bakım Ücreti Hesaplama
-    const maintenanceFeeCalculated = (building.maintenanceFee * building.elevatorCount).toFixed(2);
-    receiptHtml = receiptHtml.replace(/{{MAINTENANCE_FEE_CALCULATED}}/g, `${maintenanceFeeCalculated} TL`);
-
-    // Takılan Parçalar Bölümü (varsa)
-    const installedParts = state.partInstallations.filter(pi => pi.buildingId === building.id && pi.installDate === new Date().toISOString().split('T')[0]);
-    const manualInstalledParts = state.manualPartInstallations.filter(mpi => mpi.buildingId === building.id && mpi.installDate === new Date().toISOString().split('T')[0]);
-
-    let partsSectionHtml = '';
-    if (installedParts.length > 0 || manualInstalledParts.length > 0) {
-        partsSectionHtml = `
-            <div class="parts-section maintenance-summary-section">
-                <h3>DEĞİŞTİRİLEN PARÇALAR</h3>
-                ${installedParts.map(pi => {
-                    const part = state.parts.find(p => p.id === pi.partId);
-                    return part ? `<div class="summary-item"><span>${pi.quantity} Adet ${part.name}</span><span>${(part.price * pi.quantity).toFixed(2)} TL</span></div>` : '';
-                }).join('')}
-                ${manualInstalledParts.map(mpi => `
-                    <div class="summary-item"><span>${mpi.quantity} Adet ${mpi.partName}</span><span>${mpi.totalPrice.toFixed(2)} TL</span></div>
-                `).join('')}
-            </div>
-        `;
-    }
-    receiptHtml = receiptHtml.replace(/{{PARTS_SECTION}}/g, partsSectionHtml);
-
-    // Toplam Tutar Hesaplama
-    const totalMaintenanceFee = building.maintenanceFee * building.elevatorCount;
-    const totalPartsCost = installedParts.reduce((sum, pi) => {
-        const part = state.parts.find(p => p.id === pi.partId);
-        return sum + (part ? part.price * pi.quantity : 0);
-    }, 0);
-    const totalManualPartsCost = manualInstalledParts.reduce((sum, mpi) => sum + mpi.totalPrice, 0);
-
-    const finalTotalAmount = (totalMaintenanceFee + totalPartsCost + totalManualPartsCost).toFixed(2);
-    receiptHtml = receiptHtml.replace(/{{FINAL_TOTAL_AMOUNT}}/g, `${finalTotalAmount} TL`);
-
-    // Binanın Güncel Borcu
-    const buildingCurrentDebtSection = building.debt > 0 ? `
-        <span class="building-current-debt">Binanın Güncel Borcu: ${building.debt.toFixed(2)} TL</span>
-    ` : '';
-    receiptHtml = receiptHtml.replace(/{{BUILDING_CURRENT_DEBT_SECTION}}/g, buildingCurrentDebtSection);
-
-
-    return receiptHtml;
-};
-
-
 const initialState: AppState = {
   buildings: [],
   parts: [],
@@ -107,6 +27,7 @@ const initialState: AppState = {
     },
     ceEmblemUrl: '/ce.png',
     tseEmblemUrl: '/ts.jpg',
+    // GÖRSELDEKİ YENİ ŞABLONA GÖRE GÜNCELLENDİ
     receiptTemplate: `
       <div class="receipt-container">
         <div class="header-section">
@@ -325,6 +246,8 @@ const initialState: AppState = {
           font-weight: bold;
           color: #444;
         }
+        /* Borç hareketleri bölümü tamamen kaldırıldığı için ilgili stiller de kaldırılabilir. */
+        /* Eğer building-current-debt-section için stil eklemek isterseniz buraya ekleyebilirsiniz. */
         .total-amount-section {
           display: flex;
           flex-direction: column; /* İçerik alt alta gelsin diye */
@@ -450,7 +373,7 @@ type Action =
   | { type: 'ADD_NOTIFICATION'; payload: string }
   | { type: 'CLEAR_NOTIFICATIONS' }
   | { type: 'TOGGLE_SIDEBAR' }
-  | { type: 'TOGGLE_MAINTENANCE'; payload: { buildingId: string; showReceipt: boolean } } // showReceipt artık bu aksiyonun parçası
+  | { type: 'TOGGLE_MAINTENANCE'; payload: { buildingId: string; showReceipt: boolean } }
   | { type: 'REPORT_FAULT'; payload: { buildingId: string; faultData: { description: string; severity: 'low' | 'medium' | 'high'; reportedBy: string } } }
   | { type: 'UPDATE_SETTINGS'; payload: Partial<AppState['settings']> }
   | { type: 'RESET_MAINTENANCE_STATUS' }
@@ -482,6 +405,7 @@ type Action =
   | { type: 'CLOSE_PRINTER_SELECTION' }
   | { type: 'INCREASE_PRICES'; payload: number }
   | { type: 'SHOW_ARCHIVED_RECEIPT'; payload: string } // Yeni aksiyon: Arşivlenmiş fişi göster
+  | { type: 'REMOVE_MAINTENANCE_STATUS_MARK'; payload: string } // Yeni aksiyon: Bakım işaretini kaldır
   | { type: 'CANCEL_MAINTENANCE'; payload: string }; // Yeni aksiyon: Bakımı iptal et
 
 function appReducer(state: AppState, action: Action): AppState {
@@ -672,7 +596,7 @@ function appReducer(state: AppState, action: Action): AppState {
         buildingId: action.payload.buildingId,
         date: action.payload.installDate,
         type: 'part',
-        description: `${action.payload.quantity} Adet ${action.payload.partName} takıldı`,
+        description: `${action.payload.quantity} Adet ${action.payload.partName} takıldı`, // "(Manuel)" ibaresi kaldırıldı
         amount: action.payload.totalPrice,
         previousDebt: manualBuilding?.debt || 0,
         newDebt: (manualBuilding?.debt || 0) + action.payload.totalPrice,
@@ -794,28 +718,20 @@ function appReducer(state: AppState, action: Action): AppState {
       
       if (!targetBuilding) return state;
 
-      // Bina zaten bakım yapıldıysa
+      // Eğer bina zaten bakım yapıldı olarak işaretliyse, bu aksiyonun doğrudan durumu değiştirmesini engelliyoruz.
+      // UI katmanı bu durumu yakalayıp kullanıcıya seçenekler sunmalı.
       if (targetBuilding.isMaintained) {
-        // Kullanıcı fişi görüntülemek istiyorsa
+        // Bu noktada UI'dan gelen 'showReceipt' isteği, kullanıcının doğrudan fişi görüntülemek istediği anlamına gelir.
+        // Bu durum, 'Bakımı iptal et' seçeneğinden ayrıdır.
         if (showReceipt) {
-          const currentMonth = new Date().toISOString().substring(0, 7);
-          // Mevcut ay içinde yapılmış son bakıma ait makbuzu bul
-          const latestReceipt = state.archivedReceipts.filter(ar =>
-            ar.buildingId === buildingId && ar.timestamp.substring(0, 7) === currentMonth
-          ).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
-
-          if (latestReceipt) {
+            const receiptHtml = generateMaintenanceReceipt(targetBuilding, state, state.currentUser?.name || 'Bilinmeyen');
             return {
-              ...state,
-              showReceiptModal: true,
-              receiptModalHtml: latestReceipt.htmlContent,
+                ...state,
+                showReceiptModal: true,
+                receiptModalHtml: receiptHtml,
             };
-          }
-          // Eğer bu ay için makbuz bulunamazsa, durumu değiştirmeden çık
-          return state;
         }
-        // Eğer bina zaten bakımlıysa ve fiş gösterilmek istenmiyorsa (UI seçenekleri gösterecek)
-        return state; 
+        return state; // Zaten bakım yapıldıysa ve fiş gösterme isteği yoksa, hiçbir şey yapma.
       }
 
       // Bina henüz bakım yapılmadıysa, bakım işlemini tamamla
@@ -944,71 +860,6 @@ function appReducer(state: AppState, action: Action): AppState {
       }
       return finalStateAfterMaintenance;
 
-    case 'CANCEL_MAINTENANCE':
-      const buildingToCancelMaintenance = state.buildings.find(b => b.id === action.payload);
-
-      if (!buildingToCancelMaintenance) return state;
-
-      const currentMonthForCancel = new Date().toISOString().substring(0, 7);
-      const maintenanceFeeToRevert = buildingToCancelMaintenance.maintenanceFee * buildingToCancelMaintenance.elevatorCount;
-
-      let updatedBuildingsAfterCancel = state.buildings.map(b =>
-        b.id === action.payload
-          ? {
-              ...b,
-              isMaintained: false, // Bakım durumunu geri al
-              lastMaintenanceDate: undefined, // Son bakım tarihini temizle
-              lastMaintenanceTime: undefined, // Son bakım saatini temizle
-            }
-          : b
-      );
-
-      // Mevcut ay içinde eklenmiş olan bakım ücretini borç kayıtlarından bul ve çıkar
-      const updatedDebtRecordsAfterCancel = state.debtRecords.filter(dr =>
-        !(dr.buildingId === action.payload &&
-          dr.type === 'maintenance' &&
-          dr.date.substring(0, 7) === currentMonthForCancel &&
-          dr.amount === maintenanceFeeToRevert) // Sadece doğru bakım ücretini geri aldığımızdan emin ol
-      );
-
-      // Eğer bakım borcu kaldırıldıysa, binanın toplam borcunu da güncelle
-      const debtRemovedAmount = state.debtRecords.length !== updatedDebtRecordsAfterCancel.length ? maintenanceFeeToRevert : 0;
-
-      updatedBuildingsAfterCancel = updatedBuildingsAfterCancel.map(b =>
-        b.id === action.payload
-          ? { ...b, debt: b.debt - debtRemovedAmount }
-          : b
-      );
-
-      return {
-        ...state,
-        buildings: updatedBuildingsAfterCancel,
-        debtRecords: updatedDebtRecordsAfterCancel,
-        updates: [
-          {
-            id: uuidv4(),
-            action: 'Bakım İptal Edildi',
-            user: state.currentUser?.name || 'Bilinmeyen',
-            timestamp: new Date().toISOString(),
-            details: `${buildingToCancelMaintenance.name} binasının bakımı iptal edildi.`,
-          },
-          ...state.updates,
-        ],
-      };
-      
-    case 'SHOW_ARCHIVED_RECEIPT':
-        const receiptId = action.payload; // Bu payload arşivlenmiş makbuzun ID'si olmalı
-        const archivedReceiptToShow = state.archivedReceipts.find(ar => ar.id === receiptId);
-
-        if (archivedReceiptToShow) {
-            return {
-                ...state,
-                showReceiptModal: true,
-                receiptModalHtml: archivedReceiptToShow.htmlContent,
-            };
-        }
-        return state; // Eğer makbuz bulunamazsa durumu değiştirmeden çık
-
     case 'REPORT_FAULT':
       const { buildingId: faultBuildingId, faultData } = action.payload;
       const faultBuilding = state.buildings.find(b => b.id === faultBuildingId);
@@ -1070,507 +921,902 @@ function appReducer(state: AppState, action: Action): AppState {
         updates: [
           {
             id: uuidv4(),
-            action: 'Bakım Durumu Sıfırlandı',
+            action: 'Bakım Durumları Sıfırlandı',
             user: state.currentUser?.name || 'Bilinmeyen',
             timestamp: new Date().toISOString(),
-            details: `Tüm binaların bakım durumu sıfırlandı.`,
+            details: 'Tüm binaların bakım durumları sıfırlandı.',
           },
           ...state.updates,
         ],
       };
 
     case 'ADD_FAULT_REPORT':
-        const newFaultReport: FaultReport = {
-            ...action.payload,
-            id: uuidv4(),
-            timestamp: new Date().toISOString(),
-            status: 'pending', // Başlangıçta bekliyor durumu
-        };
-        return {
-            ...state,
-            faultReports: [...state.faultReports, newFaultReport],
-            updates: [
-                {
-                    id: uuidv4(),
-                    action: 'Arıza Raporu Eklendi',
-                    user: state.currentUser?.name || 'Bilinmeyen',
-                    timestamp: new Date().toISOString(),
-                    details: `${newFaultReport.buildingId} için yeni arıza raporu oluşturuldu.`,
-                },
-                ...state.updates,
-            ],
-        };
+      const faultReport: FaultReport = {
+        ...action.payload,
+        id: uuidv4(),
+        timestamp: new Date().toISOString(),
+        status: 'pending',
+      };
+
+      return {
+        ...state,
+        faultReports: [...state.faultReports, faultReport],
+        notifications: [
+          `Yeni arıza bildirimi: ${action.payload.reporterName} ${action.payload.reporterSurname}`,
+          ...state.notifications,
+        ],
+        unreadNotifications: state.unreadNotifications + 1,
+      };
 
     case 'RESOLVE_FAULT_REPORT':
-        return {
-            ...state,
-            faultReports: state.faultReports.map(report =>
-                report.id === action.payload ? { ...report, status: 'resolved', resolvedDate: new Date().toISOString() } : report
-            ),
-            updates: [
-                {
-                    id: uuidv4(),
-                    action: 'Arıza Raporu Çözüldü',
-                    user: state.currentUser?.name || 'Bilinmeyen',
-                    timestamp: new Date().toISOString(),
-                    details: `${action.payload} ID'li arıza raporu çözüldü.`,
-                },
-                ...state.updates,
-            ],
-        };
+      return {
+        ...state,
+        faultReports: state.faultReports.map(report =>
+          report.id === action.payload
+            ? { ...report, status: 'resolved' }
+            : report
+        ),
+      };
 
     case 'ADD_MAINTENANCE_HISTORY':
-        const newMaintenanceHistoryEntry: MaintenanceHistory = {
-            ...action.payload,
-            id: uuidv4(),
-        };
-        return {
-            ...state,
-            maintenanceHistory: [...state.maintenanceHistory, newMaintenanceHistoryEntry],
-            updates: [
-                {
-                    id: uuidv4(),
-                    action: 'Bakım Geçmişi Eklendi',
-                    user: state.currentUser?.name || 'Bilinmeyen',
-                    timestamp: new Date().toISOString(),
-                    details: `${newMaintenanceHistoryEntry.buildingId} için bakım geçmişi kaydı eklendi.`,
-                },
-                ...state.updates,
-            ],
-        };
-    
+      const maintenanceHistory: MaintenanceHistory = {
+        ...action.payload,
+        id: uuidv4(),
+      };
+
+      return {
+        ...state,
+        maintenanceHistory: [...state.maintenanceHistory, maintenanceHistory],
+      };
+
     case 'ADD_MAINTENANCE_RECORD':
-        const newMaintenanceRecord: MaintenanceRecord = {
-            ...action.payload,
-            id: uuidv4(),
-        };
-        return {
-            ...state,
-            maintenanceRecords: [...state.maintenanceRecords, newMaintenanceRecord],
-            updates: [
-                {
-                    id: uuidv4(),
-                    action: 'Bakım Kaydı Eklendi',
-                    user: state.currentUser?.name || 'Bilinmeyen',
-                    timestamp: new Date().toISOString(),
-                    details: `${newMaintenanceRecord.buildingId} için bakım kaydı eklendi.`,
-                },
-                ...state.updates,
-            ],
-        };
+      const newMaintenanceRecord: MaintenanceRecord = { 
+        ...action.payload,
+        id: uuidv4(),
+      };
+
+      return {
+        ...state,
+        maintenanceRecords: [...state.maintenanceRecords, newMaintenanceRecord],
+      };
 
     case 'ADD_PRINTER':
-        const newPrinter: Printer = {
-            ...action.payload,
-            id: uuidv4(),
-        };
-        return {
-            ...state,
-            printers: [...state.printers, newPrinter],
-            updates: [
-                {
-                    id: uuidv4(),
-                    action: 'Yazıcı Eklendi',
-                    user: state.currentUser?.name || 'Bilinmeyen',
-                    timestamp: new Date().toISOString(),
-                    details: `${newPrinter.name} yazıcısı sisteme eklendi.`,
-                },
-                ...state.updates,
-            ],
-        };
+      const newPrinter: Printer = {
+        ...action.payload,
+        id: uuidv4(),
+      };
+
+      // Eğer bu varsayılan olarak ayarlandıysa, diğerlerinden varsayılanı kaldır
+      let updatedPrinters = state.printers;
+      if (newPrinter.isDefault) {
+        updatedPrinters = state.printers.map(p => ({ ...p, isDefault: false }));
+      }
+
+      return {
+        ...state,
+        printers: [...updatedPrinters, newPrinter],
+      };
 
     case 'UPDATE_PRINTER':
-        return {
-            ...state,
-            printers: state.printers.map(printer =>
-                printer.id === action.payload.id ? action.payload : printer
-            ),
-            updates: [
-                {
-                    id: uuidv4(),
-                    action: 'Yazıcı Güncellendi',
-                    user: state.currentUser?.name || 'Bilinmeyen',
-                    timestamp: new Date().toISOString(),
-                    details: `${action.payload.name} yazıcısı güncellendi.`,
-                },
-                ...state.updates,
-            ],
-        };
+      let printersForUpdate = state.printers;
+      
+      // Eğer bu yazıcı varsayılan olarak ayarlanıyorsa, diğerlerinden varsayılanı kaldır
+      if (action.payload.isDefault) {
+        printersForUpdate = state.printers.map(p => 
+          p.id === action.payload.id ? p : { ...p, isDefault: false }
+        );
+      }
+
+      return {
+        ...state,
+        printers: printersForUpdate.map(printer =>
+          printer.id === action.payload.id ? action.payload : printer
+        ),
+      };
 
     case 'DELETE_PRINTER':
-        const printerToDelete = state.printers.find(p => p.id === action.payload);
-        return {
-            ...state,
-            printers: state.printers.filter(printer => printer.id !== action.payload),
-            updates: [
-                {
-                    id: uuidv4(),
-                    action: 'Yazıcı Silindi',
-                    user: state.currentUser?.name || 'Bilinmeyen',
-                    timestamp: new Date().toISOString(),
-                    details: `${printerToDelete?.name || 'Bilinmeyen'} yazıcısı silindi.`,
-                },
-                ...state.updates,
-            ],
-        };
+      return {
+        ...state,
+        printers: state.printers.filter(printer => printer.id !== action.payload),
+      };
 
     case 'ADD_SMS_TEMPLATE':
-        const newSMSTemplate: SMSTemplate = {
-            ...action.payload,
-            id: uuidv4(),
-        };
-        return {
-            ...state,
-            smsTemplates: [...state.smsTemplates, newSMSTemplate],
-            updates: [
-                {
-                    id: uuidv4(),
-                    action: 'SMS Şablonu Eklendi',
-                    user: state.currentUser?.name || 'Bilinmeyen',
-                    timestamp: new Date().toISOString(),
-                    details: `${newSMSTemplate.name} SMS şablonu eklendi.`,
-                },
-                ...state.updates,
-            ],
-        };
+      const newSMSTemplate: SMSTemplate = {
+        ...action.payload,
+        id: uuidv4(),
+      };
+
+      return {
+        ...state,
+        smsTemplates: [...state.smsTemplates, newSMSTemplate],
+      };
 
     case 'UPDATE_SMS_TEMPLATE':
-        return {
-            ...state,
-            smsTemplates: state.smsTemplates.map(template =>
-                template.id === action.payload.id ? action.payload : template
-            ),
-            updates: [
-                {
-                    id: uuidv4(),
-                    action: 'SMS Şablonu Güncellendi',
-                    user: state.currentUser?.name || 'Bilinmeyen',
-                    timestamp: new Date().toISOString(),
-                    details: `${action.payload.name} SMS şablonu güncellendi.`,
-                },
-                ...state.updates,
-            ],
-        };
+      return {
+        ...state,
+        smsTemplates: state.smsTemplates.map(template =>
+          template.id === action.payload.id ? action.payload : template
+        ),
+      };
 
     case 'DELETE_SMS_TEMPLATE':
-        const smsTemplateToDelete = state.smsTemplates.find(s => s.id === action.payload);
-        return {
-            ...state,
-            smsTemplates: state.smsTemplates.filter(template => template.id !== action.payload),
-            updates: [
-                {
-                    id: uuidv4(),
-                    action: 'SMS Şablonu Silindi',
-                    user: state.currentUser?.name || 'Bilinmeyen',
-                    timestamp: new Date().toISOString(),
-                    details: `${smsTemplateToDelete?.name || 'Bilinmeyen'} SMS şablonu silindi.`,
-                },
-                ...state.updates,
-            ],
-        };
+      return {
+        ...state,
+        smsTemplates: state.smsTemplates.filter(template => template.id !== action.payload),
+      };
 
     case 'SEND_BULK_SMS':
-        // Bu aksiyon, sadece bir simülasyon veya bir harici API çağrısı için bir işaretleyici olabilir.
-        // Gerçek SMS gönderimi burada yapılmaz, sadece loglanır.
-        return {
-            ...state,
-            updates: [
-                {
-                    id: uuidv4(),
-                    action: 'Toplu SMS Gönderildi',
-                    user: state.currentUser?.name || 'Bilinmeyen',
-                    timestamp: new Date().toISOString(),
-                    details: `${action.payload.buildingIds.length} binaya SMS gönderimi denendi (Şablon ID: ${action.payload.templateId}).`,
-                },
-                ...state.updates,
-            ],
-            notifications: [
-                `Toplu SMS gönderimi başarıyla başlatıldı.`,
-                ...state.notifications,
-            ],
-            unreadNotifications: state.unreadNotifications + 1,
-        };
+      // Gerçek bir uygulamada, bu SMS göndermeyi tetikler
+      console.log('Sending SMS to buildings:', action.payload.buildingIds);
+      return state;
 
     case 'SEND_WHATSAPP':
-        // WhatsApp entegrasyonu için benzer bir mantık
-        return {
-            ...state,
-            updates: [
-                {
-                    id: uuidv4(),
-                    action: 'WhatsApp Mesajı Gönderildi',
-                    user: state.currentUser?.name || 'Bilinmeyen',
-                    timestamp: new Date().toISOString(),
-                    details: `${action.payload.buildingIds.length} binaya WhatsApp mesajı gönderimi denendi (Şablon ID: ${action.payload.templateId}).`,
-                },
-                ...state.updates,
-            ],
-            notifications: [
-                `WhatsApp mesajı gönderimi başarıyla başlatıldı.`,
-                ...state.notifications,
-            ],
-            unreadNotifications: state.unreadNotifications + 1,
-        };
-        
+      const { templateId, buildingIds } = action.payload;
+      const template = state.smsTemplates.find(t => t.id === templateId);
+      
+      if (template) {
+        buildingIds.forEach(buildingId => {
+          const building = state.buildings.find(b => b.id === buildingId);
+          if (building && building.contactInfo) {
+            const message = encodeURIComponent(template.content);
+            const phoneNumber = building.contactInfo.replace(/\D/g, '');
+            const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
+            window.open(whatsappUrl, '_blank');
+          }
+        });
+      }
+      
+      return state;
+
     case 'ADD_PROPOSAL':
-        const newProposal: Proposal = {
-            ...action.payload,
-            id: uuidv4(),
-            createdDate: new Date().toISOString(),
-            createdBy: state.currentUser?.name || 'Bilinmeyen',
-        };
-        return {
-            ...state,
-            proposals: [...state.proposals, newProposal],
-            updates: [
-                {
-                    id: uuidv4(),
-                    action: 'Teklif Oluşturuldu',
-                    user: state.currentUser?.name || 'Bilinmeyen',
-                    timestamp: new Date().toISOString(),
-                    details: `${newProposal.title} başlıklı yeni teklif oluşturuldu.`,
-                },
-                ...state.updates,
-            ],
-        };
+      const newProposal: Proposal = {
+        ...action.payload,
+        id: uuidv4(),
+        createdDate: new Date().toISOString(),
+        createdBy: state.currentUser?.name || 'Bilinmeyen',
+      };
+
+      return {
+        ...state,
+        proposals: [...state.proposals, newProposal],
+      };
 
     case 'UPDATE_PROPOSAL':
+      return {
+        ...state,
+        proposals: state.proposals.map(proposal =>
+          proposal.id === action.payload.id ? action.payload : proposal
+        ),
+      };
+
+    case 'DELETE_PROPOSAL':
+      return {
+        ...state,
+        proposals: state.proposals.filter(proposal => proposal.id !== action.payload),
+      };
+
+    case 'ADD_PAYMENT':
+      const payment: Payment = {
+        ...action.payload,
+        id: uuidv4(),
+      };
+
+      // Bina borcunu güncelle
+      const updatedBuildingsForPayment = state.buildings.map(b =>
+        b.id === action.payload.buildingId
+          ? { ...b, debt: Math.max(0, b.debt - action.payload.amount) }
+          : b
+      );
+
+      // Borç kaydı için binayı bul
+      const paymentBuilding = state.buildings.find(b => b.id === action.payload.buildingId);
+
+      // Ödeme için borç kaydı ekle
+      const paymentDebtRecord: DebtRecord = {
+        id: uuidv4(),
+        buildingId: action.payload.buildingId,
+        date: action.payload.date,
+        type: 'payment',
+        description: `Ödeme alındı`,
+        amount: action.payload.amount,
+        previousDebt: paymentBuilding?.debt || 0,
+        newDebt: Math.max(0, (paymentBuilding?.debt || 0) - action.payload.amount),
+        performedBy: action.payload.receivedBy,
+      };
+
+      return {
+        ...state,
+        payments: [...state.payments, payment],
+        buildings: updatedBuildingsForPayment,
+        debtRecords: [...state.debtRecords, paymentDebtRecord],
+        incomes: [...state.incomes, {
+          id: uuidv4(),
+          buildingId: action.payload.buildingId,
+          amount: action.payload.amount,
+          date: action.payload.date,
+          receivedBy: action.payload.receivedBy,
+        }],
+        updates: [
+          {
+            id: uuidv4(),
+            action: 'Ödeme Alındı',
+            user: state.currentUser?.name || 'Bilinmeyen',
+            timestamp: new Date().toISOString(),
+            details: `${paymentBuilding?.name || 'Bilinmeyen'} binasından ${action.payload.amount.toLocaleString('tr-TR')} ₺ ödeme alındı.`,
+          },
+          ...state.updates,
+        ],
+      };
+
+    case 'ADD_PROPOSAL_TEMPLATE':
+      const newProposalTemplate: ProposalTemplate = {
+        ...action.payload,
+        id: uuidv4(),
+      };
+
+      return {
+        ...state,
+        proposalTemplates: [...state.proposalTemplates, newProposalTemplate],
+      };
+
+    case 'UPDATE_PROPOSAL_TEMPLATE':
+      return {
+        ...state,
+        proposalTemplates: state.proposalTemplates.map(template =>
+          template.id === action.payload.id ? action.payload : template
+        ),
+      };
+
+    case 'DELETE_PROPOSAL_TEMPLATE':
+      return {
+        ...state,
+        proposalTemplates: state.proposalTemplates.filter(template => template.id !== action.payload),
+      };
+
+    case 'ADD_QR_CODE_DATA':
+      const newQRCode: QRCodeData = {
+        ...action.payload,
+        id: uuidv4(),
+      };
+
+      return {
+        ...state,
+        qrCodes: [...state.qrCodes, newQRCode],
+      };
+
+    case 'UPDATE_AUTO_SAVE_DATA':
+      const existingAutoSaveIndex = state.autoSaveData.findIndex(
+        data => data.formType === action.payload.formType && data.userId === action.payload.userId
+      );
+
+      let updatedAutoSaveData;
+      if (existingAutoSaveIndex >= 0) {
+        updatedAutoSaveData = [...state.autoSaveData];
+        updatedAutoSaveData[existingAutoSaveIndex] = action.payload;
+      } else {
+        updatedAutoSaveData = [...state.autoSaveData, action.payload];
+      }
+
+      return {
+        ...state,
+        autoSaveData: updatedAutoSaveData,
+        lastAutoSave: action.payload.timestamp,
+      };
+
+    case 'SHOW_RECEIPT_MODAL':
+      return {
+        ...state,
+        showReceiptModal: true,
+        receiptModalHtml: action.payload,
+      };
+
+    case 'CLOSE_RECEIPT_MODAL':
+      return {
+        ...state,
+        showReceiptModal: false,
+        receiptModalHtml: null,
+      };
+
+    case 'ARCHIVE_RECEIPT':
+      const archivedReceipt: ArchivedReceipt = {
+        ...action.payload,
+        id: uuidv4(),
+      };
+
+      return {
+        ...state,
+        archivedReceipts: [...state.archivedReceipts, archivedReceipt],
+      };
+
+    case 'SHOW_ARCHIVED_RECEIPT':
+        const archivedReceiptToShow = state.archivedReceipts.find(ar => ar.id === action.payload);
+        if (archivedReceiptToShow) {
+            return {
+                ...state,
+                showReceiptModal: true,
+                receiptModalHtml: archivedReceiptToShow.htmlContent,
+            };
+        }
+        console.warn(`Arşivlenmiş fiş bulunamadı: ${action.payload}`);
+        return state; 
+
+    case 'REMOVE_MAINTENANCE_STATUS_MARK':
+        const buildingToRemoveMark = state.buildings.find(b => b.id === action.payload);
         return {
             ...state,
-            proposals: state.proposals.map(proposal =>
-                proposal.id === action.payload.id ? action.payload : proposal
+            buildings: state.buildings.map(b =>
+                b.id === action.payload
+                    ? { ...b, isMaintained: false }
+                    : b
             ),
             updates: [
                 {
                     id: uuidv4(),
-                    action: 'Teklif Güncellendi',
+                    action: 'Bakım İşareti Kaldırıldı',
                     user: state.currentUser?.name || 'Bilinmeyen',
                     timestamp: new Date().toISOString(),
-                    details: `${action.payload.title} başlıklı teklif güncellendi.`,
+                    details: `${buildingToRemoveMark?.name || 'Bilinmeyen'} binasının bakım işareti kaldırıldı.`,
                 },
                 ...state.updates,
             ],
         };
 
-    case 'DELETE_PROPOSAL':
-        const proposalToDelete = state.proposals.find(p => p.id === action.payload);
-        return {
-            ...state,
-            proposals: state.proposals.filter(proposal => proposal.id !== action.payload),
-            updates: [
-                {
-                    id: uuidv4(),
-                    action: 'Teklif Silindi',
-                    user: state.currentUser?.name || 'Bilinmeyen',
-                    timestamp: new Date().toISOString(),
-                    details: `${proposalToDelete?.title || 'Bilinmeyen'} başlıklı teklif silindi.`,
-                },
-                ...state.updates,
-            ],
-        };
+    case 'CANCEL_MAINTENANCE':
+        const buildingToCancelMaintenance = state.buildings.find(b => b.id === action.payload);
+        if (!buildingToCancelMaintenance) return state;
 
-    case 'ADD_PAYMENT':
-        const newPayment: Payment = {
-            ...action.payload,
-            id: uuidv4(),
-        };
-
-        // İlgili binanın borcunu düşür
-        const updatedBuildingsAfterPayment = state.buildings.map(b =>
-            b.id === newPayment.buildingId
-                ? { ...b, debt: b.debt - newPayment.amount }
+        let updatedBuildingsAfterCancel = state.buildings.map(b =>
+            b.id === action.payload
+                ? { ...b, isMaintained: false, lastMaintenanceDate: undefined, lastMaintenanceTime: undefined }
                 : b
         );
 
-        // Borç kaydı ekle (ödeme kaydı)
-        const buildingForPayment = state.buildings.find(b => b.id === newPayment.buildingId);
-        const paymentDebtRecord: DebtRecord = {
-            id: uuidv4(),
-            buildingId: newPayment.buildingId,
-            date: newPayment.paymentDate,
-            type: 'payment',
-            description: `Ödeme yapıldı`,
-            amount: -newPayment.amount, // Ödeme olduğu için negatif değer
-            previousDebt: buildingForPayment?.debt || 0,
-            newDebt: (buildingForPayment?.debt || 0) - newPayment.amount,
-            performedBy: state.currentUser?.name || 'Bilinmeyen',
-        };
+        let updatedDebtRecordsAfterCancel = [...state.debtRecords];
+        let updatedMaintenanceHistoryAfterCancel = [...state.maintenanceHistory];
+        let updatedMaintenanceRecordsAfterCancel = [...state.maintenanceRecords];
+
+        const currentMonthYearForCancel = new Date().toISOString().substring(0, 7);
+
+        // Bakım ücreti borcunu geri al (sadece bu ay içinde eklenen bakım borcunu)
+        const lastMaintenanceDebtRecordIndex = updatedDebtRecordsAfterCancel.findIndex(dr =>
+            dr.buildingId === action.payload &&
+            dr.type === 'maintenance' &&
+            dr.date.substring(0, 7) === currentMonthYearForCancel // Sadece bu ayın bakım borcunu iptal et
+        );
+
+        if (lastMaintenanceDebtRecordIndex !== -1) {
+            const canceledMaintenanceDebt = updatedDebtRecordsAfterCancel[lastMaintenanceDebtRecordIndex].amount;
+            updatedDebtRecordsAfterCancel.splice(lastMaintenanceDebtRecordIndex, 1); // Borç kaydını kaldır
+
+            // Binanın borcunu güncelle
+            updatedBuildingsAfterCancel = updatedBuildingsAfterCancel.map(b =>
+                b.id === action.payload
+                    ? { ...b, debt: b.debt - canceledMaintenanceDebt }
+                    : b
+            );
+        }
+
+        // Son bakım geçmişi kaydını kaldır
+        const lastMaintenanceHistoryIndex = updatedMaintenanceHistoryAfterCancel.findIndex(mh => 
+            mh.buildingId === action.payload && 
+            mh.maintenanceDate.substring(0, 7) === currentMonthYearForCancel
+        ); // Sadece bu ayın geçmişini kaldır
+        if (lastMaintenanceHistoryIndex !== -1) {
+            updatedMaintenanceHistoryAfterCancel.splice(lastMaintenanceHistoryIndex, 1);
+        }
+
+        // Son bakım kaydını kaldır
+        const lastMaintenanceRecordIndex = updatedMaintenanceRecordsAfterCancel.findIndex(mr => 
+            mr.buildingId === action.payload &&
+            mr.maintenanceDate.substring(0, 7) === currentMonthYearForCancel
+        ); // Sadece bu ayın kaydını kaldır
+        if (lastMaintenanceRecordIndex !== -1) {
+            updatedMaintenanceRecordsAfterCancel.splice(lastMaintenanceRecordIndex, 1);
+        }
 
         return {
             ...state,
-            payments: [...state.payments, newPayment],
-            buildings: updatedBuildingsAfterPayment,
-            debtRecords: [...state.debtRecords, paymentDebtRecord],
+            buildings: updatedBuildingsAfterCancel,
+            debtRecords: updatedDebtRecordsAfterCancel,
+            maintenanceHistory: updatedMaintenanceHistoryAfterCancel,
+            maintenanceRecords: updatedMaintenanceRecordsAfterCancel,
             updates: [
                 {
                     id: uuidv4(),
-                    action: 'Ödeme Alındı',
+                    action: 'Bakım İptal Edildi',
                     user: state.currentUser?.name || 'Bilinmeyen',
                     timestamp: new Date().toISOString(),
-                    details: `${buildingForPayment?.name || 'Bilinmeyen'} binasından ${newPayment.amount} TL ödeme alındı.`,
-                },
-                ...state.updates,
-            ],
-        };
-
-    case 'ADD_PROPOSAL_TEMPLATE':
-        const newProposalTemplate: ProposalTemplate = {
-            ...action.payload,
-            id: uuidv4(),
-        };
-        return {
-            ...state,
-            proposalTemplates: [...state.proposalTemplates, newProposalTemplate],
-            updates: [
-                {
-                    id: uuidv4(),
-                    action: 'Teklif Şablonu Eklendi',
-                    user: state.currentUser?.name || 'Bilinmeyen',
-                    timestamp: new Date().toISOString(),
-                    details: `${newProposalTemplate.name} teklif şablonu eklendi.`,
-                },
-                ...state.updates,
-            ],
-        };
-
-    case 'UPDATE_PROPOSAL_TEMPLATE':
-        return {
-            ...state,
-            proposalTemplates: state.proposalTemplates.map(template =>
-                template.id === action.payload.id ? action.payload : template
-            ),
-            updates: [
-                {
-                    id: uuidv4(),
-                    action: 'Teklif Şablonu Güncellendi',
-                    user: state.currentUser?.name || 'Bilinmeyen',
-                    timestamp: new Date().toISOString(),
-                    details: `${action.payload.name} teklif şablonu güncellendi.`,
-                },
-                ...state.updates,
-            ],
-        };
-
-    case 'DELETE_PROPOSAL_TEMPLATE':
-        const proposalTemplateToDelete = state.proposalTemplates.find(p => p.id === action.payload);
-        return {
-            ...state,
-            proposalTemplates: state.proposalTemplates.filter(template => template.id !== action.payload),
-            updates: [
-                {
-                    id: uuidv4(),
-                    action: 'Teklif Şablonu Silindi',
-                    user: state.currentUser?.name || 'Bilinmeyen',
-                    timestamp: new Date().toISOString(),
-                    details: `${proposalTemplateToDelete?.name || 'Bilinmeyen'} teklif şablonu silindi.`,
-                },
-                ...state.updates,
-            ],
-        };
-
-    case 'ADD_QR_CODE_DATA':
-        const newQRCodeData: QRCodeData = {
-            ...action.payload,
-            id: uuidv4(),
-        };
-        return {
-            ...state,
-            qrCodes: [...state.qrCodes, newQRCodeData],
-            updates: [
-                {
-                    id: uuidv4(),
-                    action: 'QR Kod Verisi Eklendi',
-                    user: state.currentUser?.name || 'Bilinmeyen',
-                    timestamp: new Date().toISOString(),
-                    details: `Yeni QR kod verisi (${newQRCodeData.data}) eklendi.`,
-                },
-                ...state.updates,
-            ],
-        };
-
-    case 'UPDATE_AUTO_SAVE_DATA':
-        // AutoSaveData'yı güncelle
-        return {
-            ...state,
-            autoSaveData: [action.payload], // Genellikle tek bir oto kaydı tutulur
-            lastAutoSave: new Date().toISOString(),
-            hasUnsavedChanges: false, // Kayıt yapıldığı için değişiklik yok sayılır
-            isAutoSaving: false,
-        };
-
-    case 'SHOW_RECEIPT_MODAL':
-        return {
-            ...state,
-            showReceiptModal: true,
-            receiptModalHtml: action.payload,
-        };
-
-    case 'CLOSE_RECEIPT_MODAL':
-        return {
-            ...state,
-            showReceiptModal: false,
-            receiptModalHtml: null,
-        };
-
-    case 'ARCHIVE_RECEIPT':
-        const newArchivedReceipt: ArchivedReceipt = {
-            ...action.payload,
-            id: uuidv4(),
-        };
-        return {
-            ...state,
-            archivedReceipts: [...state.archivedReceipts, newArchivedReceipt],
-            updates: [
-                {
-                    id: uuidv4(),
-                    action: 'Makbuz Arşivlendi',
-                    user: state.currentUser?.name || 'Bilinmeyen',
-                    timestamp: new Date().toISOString(),
-                    details: `${newArchivedReceipt.buildingId} binası için makbuz arşivlendi.`,
+                    details: `${buildingToCancelMaintenance.name} binasının son bakımı iptal edildi.`,
                 },
                 ...state.updates,
             ],
         };
 
     case 'SHOW_PRINTER_SELECTION':
-        return {
-            ...state,
-            showPrinterSelectionModal: true,
-            printerSelectionContent: action.payload,
-        };
+      return {
+        ...state,
+        showPrinterSelectionModal: true,
+        printerSelectionContent: action.payload,
+      };
 
     case 'CLOSE_PRINTER_SELECTION':
-        return {
-            ...state,
-            showPrinterSelectionModal: false,
-            printerSelectionContent: null,
-        };
+      return {
+        ...state,
+        showPrinterSelectionModal: false,
+        printerSelectionContent: null,
+      };
 
     case 'INCREASE_PRICES':
-        const percentage = action.payload; // Yüzde olarak (örn: 10, 20)
-        return {
-            ...state,
-            parts: state.parts.map(part => ({
-                ...part,
-                price: part.price * (1 + percentage / 100),
-            })),
-            buildings: state.buildings.map(building => ({
-                ...building,
-                maintenanceFee: building.maintenanceFee * (1 + percentage / 100),
-            })),
-            updates: [
-                {
-                    id: uuidv4(),
-                    action: 'Fiyatlar Artırıldı',
-                    user: state.currentUser?.name || 'Bilinmeyen',
-                    timestamp: new Date().toISOString(),
-                    details: `Tüm parça fiyatları ve bakım ücretleri %${percentage} oranında artırıldı.`,
-                },
-                ...state.updates,
-            ],
-        };
+      const percentage = action.payload;
+      const updatedPartsWithIncrease = state.parts.map(part => ({
+        ...part,
+        price: Math.round(part.price * (1 + percentage / 100) * 100) / 100,
+      }));
+
+      return {
+        ...state,
+        parts: updatedPartsWithIncrease,
+        updates: [
+          {
+            id: uuidv4(),
+            action: 'Fiyat Artışı',
+            user: state.currentUser?.name || 'Bilinmeyen',
+            timestamp: new Date().toISOString(),
+            details: `Tüm parça fiyatları %${percentage} artırıldı.`,
+          },
+          ...state.updates,
+        ],
+      };
 
     default:
       return state;
   }
 }
+
+// Bakım fişi HTML'ini oluşturan yardımcı fonksiyon
+function generateMaintenanceReceipt(building: Building, state: AppState, technician: string): string {
+  // Bakım tarihi (sadece gün/ay/yıl)
+  const currentDateOnly = new Date().toLocaleDateString('tr-TR');
+  
+  // Bakım ücreti hesaplama
+  const maintenanceFeeCalculated = building.maintenanceFee * building.elevatorCount;
+
+  // Şirket adresini formatlama
+  const companyAddressFormatted = state.settings.companyAddress ?
+    `${state.settings.companyAddress.mahalle} ${state.settings.companyAddress.sokak} No:${state.settings.companyAddress.binaNo}, ${state.settings.companyAddress.ilce}/${state.settings.companyAddress.il}` :
+    'Adres belirtilmemiş';
+
+  // Takılan Parçaları Oluşturma
+  // Sadece fişin oluşturulduğu ay içinde takılan parçaları filtrele
+  const currentReceiptMonthYear = new Date().toISOString().substring(0, 7); //YYYY-MM
+  const installedPartsForCurrentMonth = [
+    ...state.partInstallations.filter(pi => 
+      pi.buildingId === building.id && 
+      pi.installDate.substring(0, 7) === currentReceiptMonthYear
+    ),
+    ...state.manualPartInstallations.filter(mpi => 
+      mpi.buildingId === building.id && 
+      mpi.installDate.substring(0, 7) === currentReceiptMonthYear
+    )
+  ];
+
+  let partsSectionHtml = '';
+  let totalPartsCost = 0;
+  if (installedPartsForCurrentMonth.length > 0) { // Sadece takılan parça varsa göster
+    let partsListHtml = '<ul class="parts-list">';
+    installedPartsForCurrentMonth.forEach(item => {
+      if ('partId' in item) { // Eğer bir PartInstallation ise
+        const part = state.parts.find(p => p.id === item.partId);
+        if (part) {
+          const cost = part.price * item.quantity;
+          totalPartsCost += cost;
+          partsListHtml += `<li>${item.quantity} Adet ${part.name} - ${cost.toLocaleString('tr-TR')} ₺</li>`;
+        }
+      } else { // Eğer bir ManualPartInstallation ise
+        totalPartsCost += item.totalPrice;
+        partsListHtml += `<li>${item.quantity} Adet ${item.partName} - ${item.totalPrice.toLocaleString('tr-TR')} ₺</li>`;
+      }
+    });
+    partsListHtml += '</ul>';
+
+    partsSectionHtml = `
+      <div class="parts-section">
+        <div class="section-title">Takılan Parçalar</div>
+        ${partsListHtml}
+        <p style="text-align: right; font-weight: bold; margin-top: 10px;">Parça Toplam: ${totalPartsCost.toLocaleString('tr-TR')} ₺</p>
+      </div>
+    `;
+  }
+
+  // Bakım Notu Bölümü Oluşturma (varsa)
+  let maintenanceNoteSectionHtml = '';
+  if (building.maintenanceNote && building.maintenanceNote.trim() !== '') { // Not boş değilse göster
+    maintenanceNoteSectionHtml = `
+      <div class="note-section">
+        <h3>BAKIM NOTU</h3>
+        <p>${building.maintenanceNote}</p>
+      </div>
+    `;
+  }
+
+  // Binanın Güncel Borcu bölümü (sadece borç varsa)
+  let buildingCurrentDebtSectionHtml = '';
+  if (building.debt > 0) {
+    buildingCurrentDebtSectionHtml = `
+      <p class="building-current-debt">Binanın Güncel Borcu: ${building.debt.toLocaleString('tr-TR')} ₺</p>
+    `;
+  }
+
+
+  // Toplam Tutar: Sadece mevcut bakım ücreti ve takılan parçaların toplam maliyeti
+  const finalTotalAmount = maintenanceFeeCalculated + totalPartsCost; 
+
+  // Şablonu al, yoksa boş string kullan (asıl şablon SettingsPage'den gelmeli)
+  let htmlContent = state.settings.receiptTemplate || '';
+
+  // Filigran logosu için özel yer tutucu eklendi
+  htmlContent = htmlContent.replace(/{{LOGO_WATERMARK_URL}}/g, state.settings.logo || '');
+  
+  // Amblem ve Logo Yer Tutucularını Doldurma
+  htmlContent = htmlContent
+    .replace(/{{CE_EMBLEM}}/g, state.settings.ceEmblemUrl ? `<img src="${state.settings.ceEmblemUrl}" alt="CE Amblemi">` : '')
+    .replace(/{{TSE_EMBLEM}}/g, state.settings.tseEmblemUrl ? `<img src="${state.settings.tseEmblemUrl}" alt="TSE Amblemi">` : '')
+    .replace(/{{LOGO}}/g, state.settings.logo ? `<img src="${state.settings.logo}" alt="Logo" class="logo">` : '');
+
+  // Diğer tüm dinamik alanları doldurma
+  htmlContent = htmlContent
+    .replace(/{{COMPANY_NAME}}/g, state.settings.companyName)
+    .replace(/{{COMPANY_PHONE}}/g, state.settings.companyPhone)
+    .replace(/{{COMPANY_ADDRESS}}/g, companyAddressFormatted)
+    .replace(/{{BUILDING_NAME}}/g, building.name)
+    .replace(/{{DATE}}/g, currentDateOnly) // Sadece tarih, saat yok
+    .replace(/{{MAINTENANCE_FEE_CALCULATED}}/g, `${maintenanceFeeCalculated.toLocaleString('tr-TR')} ₺`)
+    .replace(/{{TECHNICIAN_NAME}}/g, technician)
+    .replace(/{{PARTS_SECTION}}/g, partsSectionHtml)
+    // Borç bölümünü tamamen kaldırıldığı için DEBT_SECTION yer tutucusu boş string ile değiştirildi
+    .replace(/{{DEBT_SECTION}}/g, '') 
+    .replace(/{{MAINTENANCE_NOTE_SECTION}}/g, maintenanceNoteSectionHtml) // Bakım notu bölümünü ekle
+    .replace(/{{FINAL_TOTAL_AMOUNT}}/g, `${finalTotalAmount.toLocaleString('tr-TR')} ₺`)
+    .replace(/{{BUILDING_CURRENT_DEBT_SECTION}}/g, buildingCurrentDebtSectionHtml); // Binanın güncel borcu bölümünü ekle
+
+  return htmlContent;
+}
+
+const AppContext = createContext<{
+  state: AppState;
+  addBuilding: (building: Omit<Building, 'id'>) => void;
+  updateBuilding: (building: Building) => void;
+  deleteBuilding: (id: string) => void;
+  addPart: (part: Omit<Part, 'id'>) => void;
+  updatePart: (part: Part) => void;
+  deletePart: (id: string) => void;
+  installPart: (installation: Omit<PartInstallation, 'id' | 'installedBy'>) => void;
+  installManualPart: (installation: Omit<ManualPartInstallation, 'id' | 'installedBy'>) => void;
+  markPartAsPaid: (installationId: string, isManual: boolean) => void;
+  addUpdate: (update: Omit<Update, 'id' | 'timestamp'>) => void;
+  addIncome: (income: Omit<Income, 'id'>) => void;
+  setUser: (name: string) => void;
+  deleteUser: (id: string) => void;
+  addNotification: (notification: string) => void;
+  clearNotifications: () => void;
+  toggleSidebar: () => void;
+  toggleMaintenance: (buildingId: string, showReceipt?: boolean) => void;
+  reportFault: (buildingId: string, faultData: { description: string; severity: 'low' | 'medium' | 'high'; reportedBy: string }) => void;
+  updateSettings: (settings: Partial<AppState['settings']>) => void;
+  resetMaintenanceStatus: () => void;
+  addFaultReport: (buildingId: string, reporterName: string, reporterSurname: string, reporterPhone: string, apartmentNo: string, description: string) => void;
+  resolveFaultReport: (id: string) => void;
+  addMaintenanceHistory: (history: Omit<MaintenanceHistory, 'id'>) => void;
+  addMaintenanceRecord: (record: Omit<MaintenanceRecord, 'id'>) => void;
+  addPrinter: (printer: Omit<Printer, 'id'>) => void;
+  updatePrinter: (printer: Printer) => void;
+  deletePrinter: (id: string) => void;
+  addSMSTemplate: (template: Omit<SMSTemplate, 'id'>) => void;
+  updateSMSTemplate: (template: SMSTemplate) => void;
+  deleteSMSTemplate: (id: string) => void;
+  sendBulkSMS: (templateId: string, buildingIds: string[]) => void;
+  sendWhatsApp: (templateId: string, buildingIds: string[]) => void;
+  addProposal: (proposal: Omit<Proposal, 'id' | 'createdDate' | 'createdBy'>) => void;
+  updateProposal: (proposal: Proposal) => void;
+  deleteProposal: (id: string) => void;
+  addPayment: (payment: Omit<Payment, 'id'>) => void;
+  addProposalTemplate: (template: Omit<ProposalTemplate, 'id'>) => void;
+  updateProposalTemplate: (template: ProposalTemplate) => void;
+  deleteProposalTemplate: (id: string) => void;
+  addQRCodeData: (qrData: Omit<QRCodeData, 'id'>) => void;
+  updateAutoSaveData: (data: AutoSaveData) => void;
+  showReceiptModal: (htmlContent: string) => void;
+  closeReceiptModal: () => void;
+  archiveReceipt: (receipt: Omit<ArchivedReceipt, 'id'>) => void;
+  showPrinterSelection: (content: string) => void;
+  closePrinterSelection: () => void;
+  increasePrices: (percentage: number) => void;
+  showArchivedReceipt: (receiptId: string) => void; // Arşivlenmiş fişi gösterme fonksiyonu
+  removeMaintenanceStatusMark: (buildingId: string) => void; // Bakım işaretini kaldırma fonksiyonu
+  cancelMaintenance: (buildingId: string) => void; // Bakımı iptal etme fonksiyonu
+} | undefined>(undefined);
+
+export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [state, dispatch] = useReducer(appReducer, initialState);
+
+  const addBuilding = (building: Omit<Building, 'id'>) => {
+    dispatch({ type: 'ADD_BUILDING', payload: building });
+  };
+
+  const updateBuilding = (building: Building) => {
+    dispatch({ type: 'UPDATE_BUILDING', payload: building });
+  };
+
+  const deleteBuilding = (id: string) => {
+    dispatch({ type: 'DELETE_BUILDING', payload: id });
+  };
+
+  const addPart = (part: Omit<Part, 'id'>) => {
+    dispatch({ type: 'ADD_PART', payload: part });
+  };
+
+  const updatePart = (part: Part) => {
+    dispatch({ type: 'UPDATE_PART', payload: part });
+  };
+
+  const deletePart = (id: string) => {
+    dispatch({ type: 'DELETE_PART', payload: id });
+  };
+
+  const installPart = (installation: Omit<PartInstallation, 'id' | 'installedBy'>) => {
+    dispatch({ type: 'INSTALL_PART', payload: installation });
+  };
+
+  const installManualPart = (installation: Omit<ManualPartInstallation, 'id' | 'installedBy'>) => {
+    dispatch({ type: 'INSTALL_MANUAL_PART', payload: installation });
+  };
+
+  const markPartAsPaid = (installationId: string, isManual: boolean) => {
+    dispatch({ type: 'MARK_PART_AS_PAID', payload: { installationId, isManual } });
+  };
+
+  const addUpdate = (update: Omit<Update, 'id' | 'timestamp'>) => {
+    dispatch({ type: 'ADD_UPDATE', payload: update });
+  };
+
+  const addIncome = (income: Omit<Income, 'id'>) => {
+    dispatch({ type: 'ADD_INCOME', payload: income });
+  };
+
+  const setUser = (name: string) => {
+    dispatch({ type: 'SET_USER', payload: name });
+  };
+
+  const deleteUser = (id: string) => {
+    dispatch({ type: 'DELETE_USER', payload: id });
+  };
+
+  const addNotification = (notification: string) => {
+    dispatch({ type: 'ADD_NOTIFICATION', payload: notification });
+  };
+
+  const clearNotifications = () => {
+    dispatch({ type: 'CLEAR_NOTIFICATIONS' });
+  };
+
+  const toggleSidebar = () => {
+    dispatch({ type: 'TOGGLE_SIDEBAR' });
+  };
+
+  const toggleMaintenance = (buildingId: string, showReceipt: boolean = false) => {
+    dispatch({ type: 'TOGGLE_MAINTENANCE', payload: { buildingId, showReceipt } });
+  };
+
+  const reportFault = (buildingId: string, faultData: { description: string; severity: 'low' | 'medium' | 'high'; reportedBy: string }) => {
+    dispatch({ type: 'REPORT_FAULT', payload: { buildingId, faultData } });
+  };
+
+  const updateSettings = (settings: Partial<AppState['settings']>) => {
+    dispatch({ type: 'UPDATE_SETTINGS', payload: settings });
+  };
+
+  const resetMaintenanceStatus = () => {
+    dispatch({ type: 'RESET_MAINTENANCE_STATUS' });
+  };
+
+  const addFaultReport = (buildingId: string, reporterName: string, reporterSurname: string, reporterPhone: string, apartmentNo: string, description: string) => {
+    dispatch({ 
+      type: 'ADD_FAULT_REPORT', 
+      payload: { 
+        buildingId, 
+        reporterName, 
+        reporterSurname, 
+        reporterPhone, 
+        apartmentNo, 
+        description 
+      } 
+    });
+  };
+
+  const resolveFaultReport = (id: string) => {
+    dispatch({ type: 'RESOLVE_FAULT_REPORT', payload: id });
+  };
+
+  const addMaintenanceHistory = (history: Omit<MaintenanceHistory, 'id'>) => {
+    dispatch({ type: 'ADD_MAINTENANCE_HISTORY', payload: history });
+  };
+
+  const addMaintenanceRecord = (record: Omit<MaintenanceRecord, 'id'>) => {
+    dispatch({ type: 'ADD_MAINTENANCE_RECORD', payload: record });
+  };
+
+  const addPrinter = (printer: Omit<Printer, 'id'>) => {
+    dispatch({ type: 'ADD_PRINTER', payload: printer });
+  };
+
+  const updatePrinter = (printer: Printer) => {
+    dispatch({ type: 'UPDATE_PRINTER', payload: printer });
+  };
+
+  const deletePrinter = (id: string) => {
+    dispatch({ type: 'DELETE_PRINTER', payload: id });
+  };
+
+  const addSMSTemplate = (template: Omit<SMSTemplate, 'id'>) => {
+    dispatch({ type: 'ADD_SMS_TEMPLATE', payload: template });
+  };
+
+  const updateSMSTemplate = (template: SMSTemplate) => {
+    dispatch({ type: 'UPDATE_SMS_TEMPLATE', payload: template });
+  };
+
+  const deleteSMSTemplate = (id: string) => {
+    dispatch({ type: 'DELETE_SMS_TEMPLATE', payload: id });
+  };
+
+  const sendBulkSMS = (templateId: string, buildingIds: string[]) => {
+    dispatch({ type: 'SEND_BULK_SMS', payload: { templateId, buildingIds } });
+  };
+
+  const sendWhatsApp = (templateId: string, buildingIds: string[]) => {
+    dispatch({ type: 'SEND_WHATSAPP', payload: { templateId, buildingIds } });
+  };
+
+  const addProposal = (proposal: Omit<Proposal, 'id' | 'createdDate' | 'createdBy'>) => {
+    dispatch({ type: 'ADD_PROPOSAL', payload: proposal });
+  };
+
+  const updateProposal = (proposal: Proposal) => {
+    dispatch({ type: 'UPDATE_PROPOSAL', payload: proposal });
+  };
+
+  const deleteProposal = (id: string) => {
+    dispatch({ type: 'DELETE_PROPOSAL', payload: id });
+  };
+
+  const addPayment = (payment: Omit<Payment, 'id'>) => {
+    dispatch({ type: 'ADD_PAYMENT', payload: payment });
+  };
+
+  const addProposalTemplate = (template: Omit<ProposalTemplate, 'id'>) => {
+    dispatch({ type: 'ADD_PROPOSAL_TEMPLATE', payload: template });
+  };
+
+  const updateProposalTemplate = (template: ProposalTemplate) => {
+    dispatch({ type: 'UPDATE_PROPOSAL_TEMPLATE', payload: template });
+  };
+
+  const deleteProposalTemplate = (id: string) => {
+    dispatch({ type: 'DELETE_PROPOSAL_TEMPLATE', payload: id });
+  };
+
+  const addQRCodeData = (qrData: Omit<QRCodeData, 'id'>) => {
+    dispatch({ type: 'ADD_QR_CODE_DATA', payload: qrData });
+  };
+
+  const updateAutoSaveData = (data: AutoSaveData) => {
+    dispatch({ type: 'UPDATE_AUTO_SAVE_DATA', payload: data });
+  };
+
+  const showReceiptModal = (htmlContent: string) => {
+    dispatch({ type: 'SHOW_RECEIPT_MODAL', payload: htmlContent });
+  };
+
+  const closeReceiptModal = () => {
+    dispatch({ type: 'CLOSE_RECEIPT_MODAL' });
+  };
+
+  const archiveReceipt = (receipt: Omit<ArchivedReceipt, 'id'>) => {
+    dispatch({ type: 'ARCHIVE_RECEIPT', payload: receipt });
+  };
+
+  const showPrinterSelection = (content: string) => {
+    dispatch({ type: 'SHOW_PRINTER_SELECTION', payload: content });
+  };
+
+  const closePrinterSelection = () => {
+    dispatch({ type: 'CLOSE_PRINTER_SELECTION' });
+  };
+
+  const increasePrices = (percentage: number) => {
+    dispatch({ type: 'INCREASE_PRICES', payload: percentage });
+  };
+
+  // Yeni eklenen aksiyonlar
+  const showArchivedReceipt = (receiptId: string) => {
+    dispatch({ type: 'SHOW_ARCHIVED_RECEIPT', payload: receiptId });
+  };
+
+  const removeMaintenanceStatusMark = (buildingId: string) => {
+    dispatch({ type: 'REMOVE_MAINTENANCE_STATUS_MARK', payload: buildingId });
+  };
+
+  const cancelMaintenance = (buildingId: string) => {
+    dispatch({ type: 'CANCEL_MAINTENANCE', payload: buildingId });
+  };
+
+
+  return (
+    <AppContext.Provider
+      value={{
+        state,
+        addBuilding,
+        updateBuilding,
+        deleteBuilding,
+        addPart,
+        updatePart,
+        deletePart,
+        installPart,
+        installManualPart,
+        markPartAsPaid,
+        addUpdate,
+        addIncome,
+        setUser,
+        deleteUser,
+        addNotification,
+        clearNotifications,
+        toggleSidebar,
+        toggleMaintenance,
+        reportFault,
+        updateSettings,
+        resetMaintenanceStatus,
+        addFaultReport,
+        resolveFaultReport,
+        addMaintenanceHistory,
+        addMaintenanceRecord,
+        addPrinter,
+        updatePrinter,
+        deletePrinter,
+        addSMSTemplate,
+        updateSMSTemplate,
+        deleteSMSTemplate,
+        sendBulkSMS,
+        sendWhatsApp,
+        addProposal,
+        updateProposal,
+        deleteProposal,
+        addPayment,
+        addProposalTemplate,
+        updateProposalTemplate,
+        deleteProposalTemplate,
+        addQRCodeData,
+        updateAutoSaveData,
+        showReceiptModal,
+        closeReceiptModal,
+        archiveReceipt,
+        showPrinterSelection,
+        closePrinterSelection,
+        increasePrices,
+        // Yeni eklenen aksiyonları buraya da ekle
+        showArchivedReceipt,
+        removeMaintenanceStatusMark,
+        cancelMaintenance,
+      }}
+    >
+      {children}
+    </AppContext.Provider>
+  );
+};
+
+export const useApp = () => {
+  const context = useContext(AppContext);
+  if (context === undefined) {
+    throw new Error('useApp must be used within an AppProvider');
+  }
+  return context;
+};
