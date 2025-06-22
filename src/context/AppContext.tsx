@@ -20,7 +20,7 @@ interface Building {
   maintenanceFee: number;
   debt: number;
   isMaintained: boolean;
-  lastMaintenanceDate?: string; // YYYY-MM-DD
+  lastMaintenanceDate?: string; //YYYY-MM-DD
   lastMaintenanceTime?: string; // HH:MM (Yerel saat)
   maintenanceNote: string;
   isDefective?: boolean;
@@ -42,7 +42,7 @@ interface PartInstallation {
   partId: string;
   buildingId: string;
   quantity: number;
-  installDate: string; // YYYY-MM-DD
+  installDate: string; //YYYY-MM-DD
   installedBy: string;
   isPaid: boolean;
   paymentDate?: string;
@@ -54,7 +54,7 @@ interface ManualPartInstallation {
   quantity: number;
   totalPrice: number;
   buildingId: string;
-  installDate: string; // YYYY-MM-DD
+  installDate: string; //YYYY-MM-DD
   installedBy: string;
   isPaid: boolean;
   paymentDate?: string;
@@ -71,7 +71,7 @@ interface Update {
 interface Income {
   id: string;
   amount: number;
-  date: string; // YYYY-MM-DD
+  date: string; //YYYY-MM-DD
   description: string;
   buildingId?: string; // Hangi binadan geldiği (opsiyonel)
 }
@@ -84,7 +84,7 @@ interface User {
 interface DebtRecord {
   id: string;
   buildingId: string;
-  date: string; // YYYY-MM-DD
+  date: string; //YYYY-MM-DD
   type: 'maintenance' | 'part' | 'payment';
   description: string;
   amount: number;
@@ -107,7 +107,7 @@ interface FaultReport {
 interface MaintenanceHistory {
   id: string;
   buildingId: string;
-  maintenanceDate: string; // YYYY-MM-DD
+  maintenanceDate: string; //YYYY-MM-DD
   maintenanceTime: string; // HH:MM
   performedBy: string;
   maintenanceFee: number;
@@ -1873,7 +1873,7 @@ function appReducer(state: AppState, action: Action): AppState {
 const AppContext = createContext<{ state: AppState; dispatch: React.Dispatch<Action> } | undefined>(undefined);
 
 // useApp custom hook'unu oluştur
-const useApp = () => {
+export const useApp = () => { // BURASI DEĞİŞTİRİLDİ: 'export' eklendi.
   const context = useContext(AppContext);
   if (!context) {
     throw new Error('useApp must be used within an AppProvider');
