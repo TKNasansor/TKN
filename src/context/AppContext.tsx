@@ -794,7 +794,7 @@ function appReducer(state: AppState, action: Action): AppState {
       let newMaintenanceRecords = [...state.maintenanceRecords];
 
       // Bakım ücretinin bu ay içinde zaten eklenip eklenmediğini kontrol et
-      const currentMonth = new Date().toISOString().substring(0, 7); // YYYY-AA formatı
+      const currentMonth = new Date().toISOString().substring(0, 7); //YYYY-AA formatı
       const maintenanceFeeAlreadyAddedThisMonth = state.debtRecords.some(dr =>
           dr.buildingId === buildingId &&
           dr.type === 'maintenance' &&
@@ -837,7 +837,7 @@ function appReducer(state: AppState, action: Action): AppState {
       };
       newMaintenanceHistory = [...newMaintenanceHistory, maintenanceHistoryRecord];
 
-      const maintenanceRecord: MaintenanceRecord = {
+      const maintenanceRecordCurrentVisit: MaintenanceRecord = { // Değişken adı benzersiz yapıldı
         id: uuidv4(),
         buildingId,
         performedBy: state.currentUser?.name || 'Bilinmeyen',
@@ -849,7 +849,7 @@ function appReducer(state: AppState, action: Action): AppState {
         priority: 'medium',
         searchableText: `${targetBuilding.name} ${state.currentUser?.name || 'Bilinmeyen'} bakım`,
       };
-      newMaintenanceRecords = [...newMaintenanceRecords, maintenanceRecord];
+      newMaintenanceRecords = [...newMaintenanceRecords, maintenanceRecordCurrentVisit];
 
 
       const finalStateAfterMaintenance = {
@@ -1001,14 +1001,15 @@ function appReducer(state: AppState, action: Action): AppState {
       };
 
     case 'ADD_MAINTENANCE_RECORD':
-      const maintenanceRecord: MaintenanceRecord = {
+      // Değişken adı benzersiz yapıldı
+      const newMaintenanceRecord: MaintenanceRecord = { 
         ...action.payload,
         id: uuidv4(),
       };
 
       return {
         ...state,
-        maintenanceRecords: [...state.maintenanceRecords, maintenanceRecord],
+        maintenanceRecords: [...state.maintenanceRecords, newMaintenanceRecord],
       };
 
     case 'ADD_PRINTER':
@@ -1348,7 +1349,7 @@ function generateMaintenanceReceipt(building: Building, state: AppState, technic
 
   // Takılan Parçaları Oluşturma
   // Sadece fişin oluşturulduğu ay içinde takılan parçaları filtrele
-  const currentReceiptMonthYear = new Date().toISOString().substring(0, 7); // YYYY-MM
+  const currentReceiptMonthYear = new Date().toISOString().substring(0, 7); //YYYY-MM
   const installedPartsForCurrentMonth = [
     ...state.partInstallations.filter(pi => 
       pi.buildingId === building.id && 
@@ -1420,7 +1421,7 @@ function generateMaintenanceReceipt(building: Building, state: AppState, technic
 
         debtSectionHtml = `
             <div class="debt-section">
-                <div class="section-title">Borç Hareketleri</div>
+                <div class="section-title">Borç Durumu</div>
                 <div class="debt-list">
                     ${debtListHtml}
                 </div>
