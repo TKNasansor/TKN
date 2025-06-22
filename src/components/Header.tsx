@@ -38,8 +38,6 @@ const Header: React.FC = () => {
     };
   }, []);
 
-  console.log('Header state:', state.notifications, state.unreadNotifications); // Konsol logu eklendi
-  
   return (
     <header className="bg-white shadow-sm z-10">
       <div className="px-4 sm:px-6 lg:px-8">
