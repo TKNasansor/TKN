@@ -53,13 +53,15 @@ const initialState: AppState = {
             <p>{{COMPANY_ADDRESS}}</p> <!-- Firma Adresi -->
           </div>
           <div class="date-info">
-            <p>TARİH : {{DATE}}</p> <!-- Sadece Tarih -->
+            <p style="font-weight: bold; font-size: 16px; color: #333;">TARİH : {{DATE}}</p> <!-- Sadece Tarih, Kalın ve Büyük, Koyu Renk -->
           </div>
         </div>
 
         <div class="building-details-section">
           <h3>BİNANIN ADI : {{BUILDING_NAME}}</h3> <!-- Bina Adı -->
         </div>
+
+        {{MAINTENANCE_NOTE_SECTION}} <!-- Bakım Notu Bölümü (varsa) -->
 
         <div class="note-section">
           <p>NOT : Bu bakımdan sonra meydana gelebilecek kapı camı kırılması, tavan aydınlatmasının kırılması durumlarında durumu hemen firmamıza
@@ -74,8 +76,8 @@ const initialState: AppState = {
           </div>
         </div>
 
-        {{PARTS_SECTION}} <!-- Takılan Parçalar Bölümü -->
-        {{DEBT_SECTION}} <!-- Borç Durumu Bölümü -->
+        {{PARTS_SECTION}} <!-- Takılan Parçalar Bölümü (varsa) -->
+        {{DEBT_SECTION}} <!-- Borç Durumu Bölümü (varsa) -->
 
         <div class="total-amount-section">
           <span>Toplam Tutar:</span>
@@ -119,7 +121,7 @@ const initialState: AppState = {
           background-repeat: no-repeat;
           background-position: center;
           background-size: contain;
-          opacity: 0.1; /* Filigranın şeffaflığını ayarlayın (önceki 0.05'ten artırıldı) */
+          opacity: 0.25; /* Filigranın şeffaflığı artırıldı */
           z-index: 0; /* İçeriğin arkasında kalmasını sağlayın */
           pointer-events: none; /* Üzerine tıklamayı engeller */
         }
@@ -280,18 +282,16 @@ const initialState: AppState = {
             border-bottom: 1px dotted #e9e9e9;
             font-size: 14px;
             flex-wrap: wrap; /* Küçük ekranlarda sığdırmak için */
+            gap: 5px; /* Elemanlar arası boşluk */
         }
         .debt-item > span {
             flex-basis: auto;
             white-space: nowrap; /* Metnin tek satırda kalmasını sağlar */
-            margin-right: 10px; /* Elemanlar arası boşluk */
-        }
-        .debt-item > span:last-child {
-            margin-right: 0;
         }
         .debt-item-label {
             font-weight: bold;
             color: #555;
+            margin-right: 5px;
         }
 
         .total-amount-section {
@@ -353,7 +353,7 @@ const initialState: AppState = {
             page-break-inside: avoid;
           }
           .watermark {
-            opacity: 0.15; /* Yazdırma için daha belirgin olabilir, önceki 0.1'den artırıldı */
+            opacity: 0.15; /* Yazdırma için daha belirgin olabilir */
           }
         }
       </style>
@@ -384,7 +384,7 @@ const initialState: AppState = {
   lastAutoSave: undefined,
   showReceiptModal: false,
   receiptModalHtml: null,
-  archivedReceipts: [],
+  archivedReceipts: [], // Arşivlenmiş makbuzlar burada saklanacak
   showPrinterSelectionModal: false,
   printerSelectionContent: null,
 };
@@ -444,6 +444,7 @@ function appReducer(state: AppState, action: Action): AppState {
       const newBuilding: Building = {
         ...action.payload,
         id: uuidv4(),
+        maintenanceNote: '', // Yeni eklenen alan: bakım notu
       };
       return {
         ...state,
@@ -625,7 +626,7 @@ function appReducer(state: AppState, action: Action): AppState {
         buildingId: action.payload.buildingId,
         date: action.payload.installDate,
         type: 'part',
-        description: `${action.payload.quantity} adet ${action.payload.partName} takıldı (Manuel)`,
+        description: `${action.payload.quantity} adet ${action.payload.partName} takıldı`, // "(Manuel)" ibaresi kaldırıldı
         amount: action.payload.totalPrice,
         previousDebt: manualBuilding?.debt || 0,
         newDebt: (manualBuilding?.debt || 0) + action.payload.totalPrice,
@@ -849,10 +850,21 @@ function appReducer(state: AppState, action: Action): AppState {
       // Makbuz modülünü göster ve bakım tamamlandıysa fişi oluştur
       if (showReceipt && newMaintenanceStatus) {
         const receiptHtml = generateMaintenanceReceipt(targetBuilding, newState, state.currentUser?.name || 'Bilinmeyen');
+        
+        // Makbuzu arşivle
+        const archivedReceipt: ArchivedReceipt = {
+            id: uuidv4(),
+            buildingId: buildingId,
+            timestamp: new Date().toISOString(),
+            htmlContent: receiptHtml,
+            // Diğer ilgili verileri de buraya ekleyebilirsiniz (örn: totalAmount, technicianName vb.)
+        };
+        
         return {
           ...newState,
           showReceiptModal: true,
           receiptModalHtml: receiptHtml,
+          archivedReceipts: [...newState.archivedReceipts, archivedReceipt],
         };
       }
 
@@ -1202,8 +1214,6 @@ function appReducer(state: AppState, action: Action): AppState {
       };
 
     case 'SHOW_RECEIPT_MODAL':
-      // generateMaintenanceReceipt fonksiyonu zaten tüm yer tutucuları dolduruyor.
-      // Burada sadece modalı gösterme ve içeriğini atama işlemi kalıyor.
       return {
         ...state,
         showReceiptModal: true,
@@ -1291,7 +1301,7 @@ function generateMaintenanceReceipt(building: Building, state: AppState, technic
 
   let partsSectionHtml = '';
   let totalPartsCost = 0;
-  if (installedParts.length > 0) {
+  if (installedParts.length > 0) { // Sadece takılan parça varsa göster
     let partsListHtml = '<ul class="parts-list">';
     installedParts.forEach(item => {
       if ('partId' in item) { // Eğer bir PartInstallation ise
@@ -1321,35 +1331,53 @@ function generateMaintenanceReceipt(building: Building, state: AppState, technic
   // Mevcut binaya ait tüm borç kayıtlarını filtrele
   const buildingDebtRecords = state.debtRecords.filter(dr => dr.buildingId === building.id);
   let debtSectionHtml = '';
-  if (buildingDebtRecords.length > 0) {
-    let debtListHtml = ''; // <ul> yerine div içinde daha kontrollü bir yapı
-    buildingDebtRecords.forEach(record => {
-      const recordDate = new Date(record.date).toLocaleDateString('tr-TR');
-      let amountDisplay = '';
-      if (record.type === 'maintenance' || record.type === 'part') {
-        amountDisplay = `+${record.amount.toLocaleString('tr-TR')} ₺`;
-      } else if (record.type === 'payment') {
-        amountDisplay = `-${record.amount.toLocaleString('tr-TR')} ₺`;
-      }
-      // Her bir borç kaydı için daha anlaşılır bir format
-      debtListHtml += `
-        <div class="debt-item">
-          <span class="debt-item-label">Tarih:</span><span>${recordDate}</span>
-          <span class="debt-item-label">Açıklama:</span><span>${record.description}</span>
-          <span class="debt-item-label">Tutar:</span><span>${amountDisplay}</span>
-          <span class="debt-item-label">Önceki Borç:</span><span>${record.previousDebt.toLocaleString('tr-TR')} ₺</span>
-          <span class="debt-item-label">Yeni Borç:</span><span>${record.newDebt.toLocaleString('tr-TR')} ₺</span>
-        </div>
-      `;
-    });
+  if (building.debt > 0) { // Sadece binanın borcu varsa göster
+    let debtListHtml = ''; 
+    // Tüm borç kayıtlarını göster, en yeniden eskiye doğru (Tarih kaldırıldı)
+    // Sadece borç artırıcı (maintenance, part) ve azaltıcı (payment) işlemleri göster.
+    const relevantDebtRecords = buildingDebtRecords.filter(record => 
+      record.type === 'maintenance' || record.type === 'part' || record.type === 'payment'
+    );
 
-    debtSectionHtml = `
-      <div class="debt-section">
-        <div class="section-title">Borç Hareketleri</div>
-        <div class="debt-list">
-          ${debtListHtml}
-        </div>
-        <p style="text-align: right; font-weight: bold; margin-top: 10px;">Binanın Güncel Borcu: ${building.debt.toLocaleString('tr-TR')} ₺</p>
+    // Eğer hiç ilgili borç kaydı yoksa bu bölümü oluşturma
+    if (relevantDebtRecords.length > 0) {
+        relevantDebtRecords.forEach(record => {
+            let amountDisplay = '';
+            if (record.type === 'maintenance' || record.type === 'part') {
+                amountDisplay = `<span style="color: green;">+${record.amount.toLocaleString('tr-TR')} ₺</span>`; // Pozitif borç için yeşil
+            } else if (record.type === 'payment') {
+                amountDisplay = `<span style="color: red;">-${record.amount.toLocaleString('tr-TR')} ₺</span>`; // Ödeme için kırmızı
+            }
+            // Her bir borç kaydı için daha anlaşılır bir format (Tarih kaldırıldı)
+            debtListHtml += `
+                <div class="debt-item">
+                    <span class="debt-item-label">Açıklama:</span><span>${record.description}</span>
+                    <span class="debt-item-label">Tutar:</span><span>${amountDisplay}</span>
+                    <span class="debt-item-label">Önceki Borç:</span><span>${record.previousDebt.toLocaleString('tr-TR')} ₺</span>
+                    <span class="debt-item-label">Yeni Borç:</span><span>${record.newDebt.toLocaleString('tr-TR')} ₺</span>
+                </div>
+            `;
+        });
+
+        debtSectionHtml = `
+            <div class="debt-section">
+                <div class="section-title">Borç Hareketleri</div>
+                <div class="debt-list">
+                    ${debtListHtml}
+                </div>
+                <p style="text-align: right; font-weight: bold; margin-top: 10px;">Binanın Güncel Borcu: ${building.debt.toLocaleString('tr-TR')} ₺</p>
+            </div>
+        `;
+    }
+  }
+
+  // Bakım Notu Bölümü Oluşturma (varsa)
+  let maintenanceNoteSectionHtml = '';
+  if (building.maintenanceNote && building.maintenanceNote.trim() !== '') { // Not boş değilse göster
+    maintenanceNoteSectionHtml = `
+      <div class="note-section">
+        <h3>BAKIM NOTU</h3>
+        <p>${building.maintenanceNote}</p>
       </div>
     `;
   }
@@ -1380,6 +1408,7 @@ function generateMaintenanceReceipt(building: Building, state: AppState, technic
     .replace(/{{TECHNICIAN_NAME}}/g, technician)
     .replace(/{{PARTS_SECTION}}/g, partsSectionHtml)
     .replace(/{{DEBT_SECTION}}/g, debtSectionHtml)
+    .replace(/{{MAINTENANCE_NOTE_SECTION}}/g, maintenanceNoteSectionHtml) // Bakım notu bölümünü ekle
     .replace(/{{FINAL_TOTAL_AMOUNT}}/g, `${finalTotalAmount.toLocaleString('tr-TR')} ₺`);
 
   return htmlContent;
