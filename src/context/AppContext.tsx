@@ -1,6 +1,34 @@
-import React, { createContext, useContext, useReducer, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, ReactNode, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { AppState, Building, Part, PartInstallation, ManualPartInstallation, Update, Income, User, DebtRecord, FaultReport, MaintenanceHistory, MaintenanceRecord, Printer, SMSTemplate, Proposal, Payment, ProposalTemplate, QRCodeData, AutoSaveData, ArchivedReceipt } from '../types';
+import { AppState, Building, Part, PartInstallation, ManualPartInstallation, Update, Income, User, DebtRecord, FaultReport, MaintenanceHistory, MaintenanceRecord, Printer, SMSTemplate, Proposal, Payment, ProposalTemplate, QRCodeData, AutoSaveData, ArchivedReceipt, NotificationData as AppNotificationData } from '../types';
+
+// Firebase imports
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, doc, collection, query, onSnapshot, addDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+
+// Global variables provided by the Canvas environment
+declare const __app_id: string;
+declare const __firebase_config: string;
+declare const __initial_auth_token: string;
+
+// Initialize Firebase outside the component to avoid re-initialization
+const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+let app;
+let db;
+let auth;
+
+// Check if app is already initialized to prevent multiple initializations
+if (Object.keys(firebaseConfig).length > 0 && !window.firebaseApp) {
+  app = initializeApp(firebaseConfig);
+  db = getFirestore(app);
+  auth = getAuth(app);
+  window.firebaseApp = app; // Store in window to prevent re-initialization on hot-reload
+} else if (window.firebaseApp) {
+  app = window.firebaseApp;
+  db = getFirestore(app);
+  auth = getAuth(app);
+}
 
 const initialState: AppState = {
   buildings: [],
@@ -11,7 +39,7 @@ const initialState: AppState = {
   incomes: [],
   currentUser: null,
   users: [],
-  notifications: [],
+  notifications: [], // This will be populated from Firestore
   sidebarOpen: false,
   settings: {
     appTitle: 'Asansör Bakım Takip',
@@ -27,7 +55,6 @@ const initialState: AppState = {
     },
     ceEmblemUrl: '/ce.png',
     tseEmblemUrl: '/ts.jpg',
-    // GÖRSELDEKİ YENİ ŞABLONA GÖRE GÜNCELLEDİ
     receiptTemplate: `
       <div class="receipt-container">
         <div class="header-section">
@@ -246,13 +273,11 @@ const initialState: AppState = {
           font-weight: bold;
           color: #444;
         }
-        /* Borç hareketleri bölümü tamamen kaldırıldığı için ilgili stiller de kaldırılabilir. */
-        /* Eğer building-current-debt-section için stil eklemek isterseniz buraya ekleyebilirsiniz. */
         .total-amount-section {
           display: flex;
-          flex-direction: column; /* İçerik alt alta gelsin diye */
+          flex-direction: column; 
           justify-content: space-between;
-          align-items: flex-end; /* Sağ tarafa hizala */
+          align-items: flex-end; 
           background-color: #f3f4f6;
           padding: 15px 20px;
           border-top: 2px solid #dc2626;
@@ -320,7 +345,7 @@ const initialState: AppState = {
             page-break-inside: avoid;
           }
           .watermark {
-            opacity: 0.15; /* Yazdırma için daha belirgin olabilir */
+            opacity: 0.15; 
           }
         }
       </style>
@@ -351,7 +376,7 @@ const initialState: AppState = {
   lastAutoSave: undefined,
   showReceiptModal: false,
   receiptModalHtml: null,
-  archivedReceipts: [], // Arşivlenmiş makbuzlar burada saklanacak
+  archivedReceipts: [], 
   showPrinterSelectionModal: false,
   printerSelectionContent: null,
 };
@@ -370,7 +395,8 @@ type Action =
   | { type: 'ADD_INCOME'; payload: Omit<Income, 'id'> }
   | { type: 'SET_USER'; payload: string }
   | { type: 'DELETE_USER'; payload: string }
-  | { type: 'ADD_NOTIFICATION'; payload: string }
+  | { type: 'ADD_NOTIFICATION_LOCAL'; payload: AppNotificationData } // Local dispatch, not to Firestore directly
+  | { type: 'SET_NOTIFICATIONS_FROM_DB'; payload: AppNotificationData[] } // For loading from DB
   | { type: 'CLEAR_NOTIFICATIONS' }
   | { type: 'TOGGLE_SIDEBAR' }
   | { type: 'TOGGLE_MAINTENANCE'; payload: { buildingId: string; showReceipt: boolean } }
@@ -404,10 +430,10 @@ type Action =
   | { type: 'SHOW_PRINTER_SELECTION'; payload: string }
   | { type: 'CLOSE_PRINTER_SELECTION' }
   | { type: 'INCREASE_PRICES'; payload: number }
-  | { type: 'SHOW_ARCHIVED_RECEIPT'; payload: string } // Yeni aksiyon: Arşivlenmiş fişi göster
-  | { type: 'REMOVE_MAINTENANCE_STATUS_MARK'; payload: string } // Yeni aksiyon: Bakım işaretini kaldır
+  | { type: 'SHOW_ARCHIVED_RECEIPT'; payload: string } 
+  | { type: 'REMOVE_MAINTENANCE_STATUS_MARK'; payload: string } 
   | { type: 'CANCEL_MAINTENANCE'; payload: string }
-  | { type: 'REVERT_MAINTENANCE'; payload: string }; // Yeni aksiyon: Bakımı geri al
+  | { type: 'REVERT_MAINTENANCE'; payload: string }; 
 
 function appReducer(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -415,7 +441,7 @@ function appReducer(state: AppState, action: Action): AppState {
       const newBuilding: Building = {
         ...action.payload,
         id: uuidv4(),
-        maintenanceNote: '', // Yeni eklenen alan: Bakım notu
+        maintenanceNote: '', 
       };
       return {
         ...state,
@@ -436,7 +462,7 @@ function appReducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         buildings: state.buildings.map(building =>
-          building.id === action.payload.id ? { ...building, ...action.payload } : building // Ensure maintenanceNote can be updated
+          building.id === action.payload.id ? { ...building, ...action.payload } : building
         ),
         updates: [
           {
@@ -529,21 +555,18 @@ function appReducer(state: AppState, action: Action): AppState {
 
       const totalPartCost = part.price * action.payload.quantity;
 
-      // Parça miktarını güncelle
       const updatedParts = state.parts.map(p =>
         p.id === action.payload.partId
           ? { ...p, quantity: p.quantity - action.payload.quantity }
           : p
       );
 
-      // Bina borcunu güncelle
       const updatedBuildings = state.buildings.map(b =>
         b.id === action.payload.buildingId
           ? { ...b, debt: b.debt + totalPartCost }
           : b
       );
 
-      // Borç kaydı ekle
       const debtRecord: DebtRecord = {
         id: uuidv4(),
         buildingId: action.payload.buildingId,
@@ -554,7 +577,7 @@ function appReducer(state: AppState, action: Action): AppState {
         previousDebt: building?.debt || 0,
         newDebt: (building?.debt || 0) + totalPartCost,
         performedBy: state.currentUser?.name || 'Bilinmeyen',
-        relatedRecordId: null, // Parça takılması bir bakım kaydı ile doğrudan ilişkili değil
+        relatedRecordId: null, 
       };
 
       return {
@@ -585,25 +608,23 @@ function appReducer(state: AppState, action: Action): AppState {
 
       const manualBuilding = state.buildings.find(b => b.id === action.payload.buildingId);
 
-      // Bina borcunu güncelle
       const updatedBuildingsManual = state.buildings.map(b =>
         b.id === action.payload.buildingId
           ? { ...b, debt: b.debt + action.payload.totalPrice }
           : b
       );
 
-      // Borç kaydı ekle
       const manualDebtRecord: DebtRecord = {
         id: uuidv4(),
         buildingId: action.payload.buildingId,
         date: action.payload.installDate,
         type: 'part',
-        description: `${action.payload.quantity} Adet ${action.payload.partName} takıldı`, // "(Manuel)" ibaresi kaldırıldı
+        description: `${action.payload.quantity} Adet ${action.payload.partName} takıldı`,
         amount: action.payload.totalPrice,
         previousDebt: manualBuilding?.debt || 0,
         newDebt: (manualBuilding?.debt || 0) + action.payload.totalPrice,
         performedBy: state.currentUser?.name || 'Bilinmeyen',
-        relatedRecordId: null, // Manuel parça takılması bir bakım kaydı ile doğrudan ilişkili değil
+        relatedRecordId: null, 
       };
 
       return {
@@ -695,14 +716,20 @@ function appReducer(state: AppState, action: Action): AppState {
         users: state.users.filter(user => user.id !== action.payload),
       };
 
-    case 'ADD_NOTIFICATION':
-      const newNotification = action.payload; // Bildirimin kendisini al
-      console.log('Bildirim eklendi (AppProvider):', newNotification, 'Mevcut bildirimler:', state.notifications); // Konsol logu eklendi
+    case 'ADD_NOTIFICATION_LOCAL': // Used for local state update after DB sync
       return {
         ...state,
-        notifications: [newNotification, ...state.notifications],
+        notifications: [action.payload.message, ...state.notifications], // Assuming message is string
         unreadNotifications: state.unreadNotifications + 1,
       };
+
+    case 'SET_NOTIFICATIONS_FROM_DB': // Used to set notifications from Firestore
+        const notificationsFromDb = action.payload.map(n => n.message); // Get just the message strings
+        return {
+            ...state,
+            notifications: notificationsFromDb,
+            unreadNotifications: notificationsFromDb.length, // Set unread count based on fetched notifications
+        };
 
     case 'CLEAR_NOTIFICATIONS':
       return {
@@ -723,11 +750,7 @@ function appReducer(state: AppState, action: Action): AppState {
       
       if (!targetBuilding) return state;
 
-      // Eğer bina zaten bakım yapıldı olarak işaretliyse, bu aksiyonun doğrudan durumu değiştirmesini engelliyoruz.
-      // UI katmanı bu durumu yakalayıp kullanıcıya seçenekler sunmalı.
       if (targetBuilding.isMaintained) {
-        // Bu noktada UI'dan gelen 'showReceipt' isteği, kullanıcının doğrudan fişi görüntülemek istediği anlamına gelir.
-        // Bu durum, 'Bakımı iptal et' seçeneğinden ayrıdır.
         if (showReceipt) {
             const receiptHtml = generateMaintenanceReceipt(targetBuilding, state, state.currentUser?.name || 'Bilinmeyen');
             return {
@@ -736,11 +759,10 @@ function appReducer(state: AppState, action: Action): AppState {
                 receiptModalHtml: receiptHtml,
             };
         }
-        return state; // Zaten bakım yapıldıysa ve fiş gösterme isteği yoksa, hiçbir şey yapma.
+        return state; 
       }
 
-      // Bina henüz bakım yapılmadıysa, bakım işlemini tamamla
-      const newMaintenanceStatus = true; // Her zaman true olarak ayarla
+      const newMaintenanceStatus = true; 
       const currentDateISO = new Date().toISOString().split('T')[0];
       const currentTimeLocale = new Date().toLocaleTimeString('tr-TR', { 
         hour: '2-digit', 
@@ -754,7 +776,7 @@ function appReducer(state: AppState, action: Action): AppState {
               isMaintained: newMaintenanceStatus,
               lastMaintenanceDate: newMaintenanceStatus ? currentDateISO : b.lastMaintenanceDate,
               lastMaintenanceTime: newMaintenanceStatus ? currentTimeLocale : b.lastMaintenanceTime,
-              isDefective: false, // Bakım yapıldığında arıza durumunu temizle
+              isDefective: false, 
               defectiveNote: undefined,
               faultSeverity: undefined,
               faultTimestamp: undefined,
@@ -767,7 +789,6 @@ function appReducer(state: AppState, action: Action): AppState {
       let newMaintenanceHistory = [...state.maintenanceHistory];
       let newMaintenanceRecords = [...state.maintenanceRecords];
 
-      // Yeni bir MaintenanceRecord oluştur
       const newMaintenanceRecordId = uuidv4();
       const maintenanceRecordCurrentVisit: MaintenanceRecord = { 
         id: newMaintenanceRecordId,
@@ -776,33 +797,30 @@ function appReducer(state: AppState, action: Action): AppState {
         maintenanceDate: currentDateISO,
         maintenanceTime: currentTimeLocale,
         elevatorCount: targetBuilding.elevatorCount,
-        totalFee: targetBuilding.maintenanceFee * targetBuilding.elevatorCount, // Bu ziyaretin ücreti
+        totalFee: targetBuilding.maintenanceFee * targetBuilding.elevatorCount, 
         status: 'completed',
         priority: 'medium',
         searchableText: `${targetBuilding.name} ${state.currentUser?.name || 'Bilinmeyen'} bakım`,
       };
       newMaintenanceRecords = [...newMaintenanceRecords, maintenanceRecordCurrentVisit];
 
-      // Bakım ücretinin bu ay içinde zaten eklenip eklenmediğini kontrol et (sadece 1 defa yazılsın)
-      const currentMonth = new Date().toISOString().substring(0, 7); //YYYY-MM formatı
+      const currentMonth = new Date().toISOString().substring(0, 7); 
       const maintenanceFeeAlreadyAddedThisMonth = state.debtRecords.some(dr =>
           dr.buildingId === tmBuildingId &&
           dr.type === 'maintenance' &&
           dr.date.substring(0, 7) === currentMonth &&
-          dr.relatedRecordId === newMaintenanceRecordId // Bu id ile daha önce eklenip eklenmediğini kontrol et
+          dr.relatedRecordId === newMaintenanceRecordId 
       );
 
       if (!maintenanceFeeAlreadyAddedThisMonth) {
           const maintenanceFee = targetBuilding.maintenanceFee * targetBuilding.elevatorCount;
           
-          // Bina borcunu güncelle (Sadece bu ay için ilk kez ekle)
           updatedBuildingsForMaintenance = updatedBuildingsForMaintenance.map(b =>
             b.id === tmBuildingId
                 ? { ...b, debt: b.debt + maintenanceFee }
                 : b
           );
 
-          // Borç kaydı ekle (Sadece bu ay için ilk kez ekle)
           const maintenanceDebtRecord: DebtRecord = {
               id: uuidv4(),
               buildingId: tmBuildingId,
@@ -813,20 +831,19 @@ function appReducer(state: AppState, action: Action): AppState {
               previousDebt: targetBuilding.debt,
               newDebt: (targetBuilding.debt || 0) + maintenanceFee,
               performedBy: state.currentUser?.name || 'Bilinmeyen',
-              relatedRecordId: newMaintenanceRecordId, // İlişkili MaintenanceRecord id'sini ekle
+              relatedRecordId: newMaintenanceRecordId, 
           };
           newDebtRecords = [...newDebtRecords, maintenanceDebtRecord];
       }
 
-      // Bakım geçmişine her ziyaret için ekle, ücret eklenmese bile
       const maintenanceHistoryRecord: MaintenanceHistory = {
         id: uuidv4(),
         buildingId: tmBuildingId,
         maintenanceDate: currentDateISO,
         maintenanceTime: currentTimeLocale,
         performedBy: state.currentUser?.name || 'Bilinmeyen',
-        maintenanceFee: targetBuilding.maintenanceFee * targetBuilding.elevatorCount, // Bu ziyaretin ücreti
-        relatedRecordId: newMaintenanceRecordId, // İlişkili MaintenanceRecord id'sini ekle
+        maintenanceFee: targetBuilding.maintenanceFee * targetBuilding.elevatorCount, 
+        relatedRecordId: newMaintenanceRecordId, 
       };
       newMaintenanceHistory = [...newMaintenanceHistory, maintenanceHistoryRecord];
 
@@ -849,21 +866,19 @@ function appReducer(state: AppState, action: Action): AppState {
         ],
       };
 
-      // Makbuz modülünü göster ve bakım tamamlandıysa fişi oluştur
       if (showReceipt) { 
         const receiptHtml = generateMaintenanceReceipt(targetBuilding, finalStateAfterMaintenance, state.currentUser?.name || 'Bilinmeyen');
         
-        // Makbuzu arşivle
         const archivedReceipt: ArchivedReceipt = {
             id: uuidv4(),
             buildingId: tmBuildingId,
-            createdDate: currentDateISO, // createdDate eklendi
-            createdBy: state.currentUser?.name || 'Bilinmeyen', // createdBy eklendi
-            maintenanceDate: currentDateISO, // maintenanceDate eklendi
-            buildingName: targetBuilding.name, // buildingName eklendi
+            createdDate: currentDateISO, 
+            createdBy: state.currentUser?.name || 'Bilinmeyen', 
+            maintenanceDate: currentDateISO, 
+            buildingName: targetBuilding.name, 
             htmlContent: receiptHtml,
-            relatedRecordId: newMaintenanceRecordId, // İlişkili MaintenanceRecord id'sini ekle
-            timestamp: new Date().toISOString(), // timestamp eklendi
+            relatedRecordId: newMaintenanceRecordId, 
+            timestamp: new Date().toISOString(), 
         };
         
         return {
@@ -894,6 +909,22 @@ function appReducer(state: AppState, action: Action): AppState {
           : b
       );
 
+      const notificationMessage = `${faultBuilding.name} binasında arıza bildirildi (${faultData.severity === 'high' ? 'Yüksek' : faultData.severity === 'medium' ? 'Orta' : 'Düşük'} öncelik)`;
+      
+      // Firestore'a bildirim ekleme
+      if (db && state.currentUser?.uid) {
+        const notificationsCollectionRef = collection(db, `artifacts/${__app_id}/users/${state.currentUser.uid}/notifications`);
+        addDoc(notificationsCollectionRef, {
+          message: notificationMessage,
+          timestamp: new Date().toISOString(),
+          type: 'error', // Assuming fault reports are 'error' type
+          severity: faultData.severity,
+          actionRequired: true,
+          relatedId: faultBuildingId,
+          userId: state.currentUser.uid,
+        }).catch(console.error);
+      }
+
       return {
         ...state,
         buildings: updatedBuildingsForFault,
@@ -907,11 +938,8 @@ function appReducer(state: AppState, action: Action): AppState {
           },
           ...state.updates,
         ],
-        notifications: [
-          `${faultBuilding.name} binasında arıza bildirildi (${faultData.severity === 'high' ? 'Yüksek' : faultData.severity === 'medium' ? 'Orta' : 'Düşük'} öncelik)`,
-          ...state.notifications,
-        ],
-        unreadNotifications: state.unreadNotifications + 1,
+        // notifications ve unreadNotifications şimdi Firestore listener tarafından güncellenecek.
+        // Bu yüzden doğrudan burada güncellemiyoruz.
       };
 
     case 'UPDATE_SETTINGS':
@@ -953,14 +981,24 @@ function appReducer(state: AppState, action: Action): AppState {
         status: 'pending',
       };
 
+      // Firestore'a bildirim ekleme (örnek: arıza bildirimleri için)
+      if (db && state.currentUser?.uid) {
+        const notificationsCollectionRef = collection(db, `artifacts/${__app_id}/users/${state.currentUser.uid}/notifications`);
+        addDoc(notificationsCollectionRef, {
+          message: `Yeni arıza bildirimi: ${action.payload.reporterName} ${action.payload.reporterSurname}`,
+          timestamp: new Date().toISOString(),
+          type: 'info', // Adjust type as necessary
+          severity: 'high', // Assuming fault reports are high priority
+          actionRequired: true,
+          relatedId: action.payload.buildingId,
+          userId: state.currentUser.uid,
+        }).catch(console.error);
+      }
+
       return {
         ...state,
         faultReports: [...state.faultReports, faultReport],
-        notifications: [
-          `Yeni arıza bildirimi: ${action.payload.reporterName} ${action.payload.reporterSurname}`,
-          ...state.notifications,
-        ],
-        unreadNotifications: state.unreadNotifications + 1,
+        // notifications ve unreadNotifications şimdi Firestore listener tarafından güncellenecek.
       };
 
     case 'RESOLVE_FAULT_REPORT':
@@ -1001,7 +1039,6 @@ function appReducer(state: AppState, action: Action): AppState {
         id: uuidv4(),
       };
 
-      // Eğer bu varsayılan olarak ayarlandıysa, diğerlerinden varsayılanı kaldır
       let updatedPrinters = state.printers;
       if (newPrinter.isDefault) {
         updatedPrinters = state.printers.map(p => ({ ...p, isDefault: false }));
@@ -1015,7 +1052,6 @@ function appReducer(state: AppState, action: Action): AppState {
     case 'UPDATE_PRINTER':
       let printersForUpdate = state.printers;
       
-      // Eğer bu yazıcı varsayılan olarak ayarlanıyorsa, diğerlerinden varsayılanı kaldır
       if (action.payload.isDefault) {
         printersForUpdate = state.printers.map(p => 
           p.id === action.payload.id ? p : { ...p, isDefault: false }
@@ -1061,7 +1097,6 @@ function appReducer(state: AppState, action: Action): AppState {
       };
 
     case 'SEND_BULK_SMS':
-      // Gerçek bir uygulamada, bu SMS göndermeyi tetikler
       console.log('Sending SMS to buildings:', action.payload.buildingIds);
       return state;
 
@@ -1116,17 +1151,14 @@ function appReducer(state: AppState, action: Action): AppState {
         id: uuidv4(),
       };
 
-      // Bina borcunu güncelle
       const updatedBuildingsForPayment = state.buildings.map(b =>
         b.id === action.payload.buildingId
           ? { ...b, debt: Math.max(0, b.debt - action.payload.amount) }
           : b
       );
 
-      // Borç kaydı için binayı bul
       const paymentBuilding = state.buildings.find(b => b.id === action.payload.buildingId);
 
-      // Ödeme için borç kaydı ekle
       const paymentDebtRecord: DebtRecord = {
         id: uuidv4(),
         buildingId: action.payload.buildingId,
@@ -1137,7 +1169,7 @@ function appReducer(state: AppState, action: Action): AppState {
         previousDebt: paymentBuilding?.debt || 0,
         newDebt: Math.max(0, (paymentBuilding?.debt || 0) - action.payload.amount),
         performedBy: action.payload.receivedBy,
-        relatedRecordId: null, // Ödeme bir bakım kaydı ile doğrudan ilişkili değil
+        relatedRecordId: null, 
       };
 
       return {
@@ -1293,18 +1325,16 @@ function appReducer(state: AppState, action: Action): AppState {
 
         const currentMonthYearForCancel = new Date().toISOString().substring(0, 7);
 
-        // Bakım ücreti borcunu geri al (sadece bu ay içinde eklenen bakım borcunu)
         const lastMaintenanceDebtRecordIndex = updatedDebtRecordsAfterCancel.findIndex(dr =>
             dr.buildingId === action.payload &&
             dr.type === 'maintenance' &&
-            dr.date.substring(0, 7) === currentMonthYearForCancel // Sadece bu ayın bakım borcunu iptal et
+            dr.date.substring(0, 7) === currentMonthYearForCancel 
         );
 
         if (lastMaintenanceDebtRecordIndex !== -1) {
             const canceledMaintenanceDebt = updatedDebtRecordsAfterCancel[lastMaintenanceDebtRecordIndex].amount;
-            updatedDebtRecordsAfterCancel.splice(lastMaintenanceDebtRecordIndex, 1); // Borç kaydını kaldır
+            updatedDebtRecordsAfterCancel.splice(lastMaintenanceDebtRecordIndex, 1); 
 
-            // Binanın borcunu güncelle
             updatedBuildingsAfterCancel = updatedBuildingsAfterCancel.map(b =>
                 b.id === action.payload
                     ? { ...b, debt: b.debt - canceledMaintenanceDebt }
@@ -1312,20 +1342,18 @@ function appReducer(state: AppState, action: Action): AppState {
             );
         }
 
-        // Son bakım geçmişi kaydını kaldır
         const lastMaintenanceHistoryIndex = updatedMaintenanceHistoryAfterCancel.findIndex(mh => 
             mh.buildingId === action.payload && 
             mh.maintenanceDate.substring(0, 7) === currentMonthYearForCancel
-        ); // Sadece bu ayın geçmişini kaldır
+        ); 
         if (lastMaintenanceHistoryIndex !== -1) {
             updatedMaintenanceHistoryAfterCancel.splice(lastMaintenanceHistoryIndex, 1);
         }
 
-        // Son bakım kaydını kaldır
         const lastMaintenanceRecordIndex = updatedMaintenanceRecordsAfterCancel.findIndex(mr => 
             mr.buildingId === action.payload &&
             mr.maintenanceDate.substring(0, 7) === currentMonthYearForCancel
-        ); // Sadece bu ayın kaydını kaldır
+        ); 
         if (lastMaintenanceRecordIndex !== -1) {
             updatedMaintenanceRecordsAfterCancel.splice(lastMaintenanceRecordIndex, 1);
         }
@@ -1353,24 +1381,21 @@ function appReducer(state: AppState, action: Action): AppState {
         const buildingToRevert = state.buildings.find(b => b.id === buildingIdToRevert);
         if (!buildingToRevert) return state;
 
-        // Binanın en son bakım kaydını bul
         const latestMaintenanceRecord = state.maintenanceRecords
             .filter(mr => mr.buildingId === buildingIdToRevert)
             .sort((a, b) => new Date(b.maintenanceDate + ' ' + b.maintenanceTime).getTime() - new Date(a.maintenanceDate + ' ' + a.maintenanceTime).getTime())
-            .shift(); // En sonuncuyu al ve diziden çıkar
+            .shift(); 
 
         if (!latestMaintenanceRecord) {
             console.warn(`No maintenance record found for building ${buildingIdToRevert} to revert.`);
             return state;
         }
 
-        // İlişkili kayıtları filtrele
         const newMaintenanceRecordsAfterRevert = state.maintenanceRecords.filter(mr => mr.id !== latestMaintenanceRecord.id);
         const newMaintenanceHistoryAfterRevert = state.maintenanceHistory.filter(mh => mh.relatedRecordId !== latestMaintenanceRecord.id);
         const newDebtRecordsAfterRevert = state.debtRecords.filter(dr => dr.relatedRecordId !== latestMaintenanceRecord.id);
         const newArchivedReceiptsAfterRevert = state.archivedReceipts.filter(ar => ar.relatedRecordId !== latestMaintenanceRecord.id);
 
-        // Bina borcunu geri al
         const revertedDebtAmount = latestMaintenanceRecord.totalFee;
         const updatedBuildingsAfterRevert = state.buildings.map(b =>
             b.id === buildingIdToRevert
@@ -1378,7 +1403,7 @@ function appReducer(state: AppState, action: Action): AppState {
                     isMaintained: false, 
                     lastMaintenanceDate: undefined, 
                     lastMaintenanceTime: undefined,
-                    debt: b.debt - revertedDebtAmount // Bakım ücretini borçtan düş
+                    debt: b.debt - revertedDebtAmount 
                 }
                 : b
         );
@@ -1443,22 +1468,15 @@ function appReducer(state: AppState, action: Action): AppState {
   }
 }
 
-// Bakım fişi HTML'ini oluşturan yardımcı fonksiyon
 function generateMaintenanceReceipt(building: Building, state: AppState, technician: string): string {
-  // Bakım tarihi (sadece gün/ay/yıl)
   const currentDateOnly = new Date().toLocaleDateString('tr-TR');
-  
-  // Bakım ücreti hesaplama
   const maintenanceFeeCalculated = building.maintenanceFee * building.elevatorCount;
 
-  // Şirket adresini formatlama
   const companyAddressFormatted = state.settings.companyAddress ?
     `${state.settings.companyAddress.mahalle} ${state.settings.companyAddress.sokak} No:${state.settings.companyAddress.binaNo}, ${state.settings.companyAddress.ilce}/${state.settings.companyAddress.il}` :
     'Adres belirtilmemiş';
 
-  // Takılan Parçaları Oluşturma
-  // Sadece fişin oluşturulduğu ay içinde takılan parçaları filtrele
-  const currentReceiptMonthYear = new Date().toISOString().substring(0, 7); //YYYY-MM
+  const currentReceiptMonthYear = new Date().toISOString().substring(0, 7); 
   const installedPartsForCurrentMonth = [
     ...state.partInstallations.filter(pi => 
       pi.buildingId === building.id && 
@@ -1472,17 +1490,17 @@ function generateMaintenanceReceipt(building: Building, state: AppState, technic
 
   let partsSectionHtml = '';
   let totalPartsCost = 0;
-  if (installedPartsForCurrentMonth.length > 0) { // Sadece takılan parça varsa göster
+  if (installedPartsForCurrentMonth.length > 0) { 
     let partsListHtml = '<ul class="parts-list">';
     installedPartsForCurrentMonth.forEach(item => {
-      if ('partId' in item) { // Eğer bir PartInstallation ise
+      if ('partId' in item) { 
         const part = state.parts.find(p => p.id === item.partId);
         if (part) {
           const cost = part.price * item.quantity;
           totalPartsCost += cost;
           partsListHtml += `<li>${item.quantity} Adet ${part.name} - ${cost.toLocaleString('tr-TR')} ₺</li>`;
         }
-      } else { // Eğer bir ManualPartInstallation ise
+      } else { 
         totalPartsCost += item.totalPrice;
         partsListHtml += `<li>${item.quantity} Adet ${item.partName} - ${item.totalPrice.toLocaleString('tr-TR')} ₺</li>`;
       }
@@ -1498,9 +1516,8 @@ function generateMaintenanceReceipt(building: Building, state: AppState, technic
     `;
   }
 
-  // Bakım Notu Bölümü Oluşturma (varsa)
   let maintenanceNoteSectionHtml = '';
-  if (building.maintenanceNote && building.maintenanceNote.trim() !== '') { // Not boş değilse göster
+  if (building.maintenanceNote && building.maintenanceNote.trim() !== '') { 
     maintenanceNoteSectionHtml = `
       <div class="note-section">
         <h3>BAKIM NOTU</h3>
@@ -1509,7 +1526,6 @@ function generateMaintenanceReceipt(building: Building, state: AppState, technic
     `;
   }
 
-  // Binanın Güncel Borcu bölümü (sadece borç varsa)
   let buildingCurrentDebtSectionHtml = '';
   if (building.debt > 0) {
     buildingCurrentDebtSectionHtml = `
@@ -1517,47 +1533,39 @@ function generateMaintenanceReceipt(building: Building, state: AppState, technic
     `;
   }
 
-
-  // Toplam Tutar: Sadece mevcut bakım ücreti ve takılan parçaların toplam maliyeti
   const finalTotalAmount = maintenanceFeeCalculated + totalPartsCost; 
 
-  // Şablonu al, yoksa boş string kullan (asıl şablon SettingsPage'den gelmeli)
   let htmlContent = state.settings.receiptTemplate || '';
 
-  // Filigran logosu için özel yer tutucu eklendi
   htmlContent = htmlContent.replace(/{{LOGO_WATERMARK_URL}}/g, state.settings.logo || '');
   
-  // Amblem ve Logo Yer Tutucularını Doldurma
   htmlContent = htmlContent
     .replace(/{{CE_EMBLEM}}/g, state.settings.ceEmblemUrl ? `<img src="${state.settings.ceEmblemUrl}" alt="CE Amblemi">` : '')
     .replace(/{{TSE_EMBLEM}}/g, state.settings.tseEmblemUrl ? `<img src="${state.settings.tseEmblemUrl}" alt="TSE Amblemi">` : '')
     .replace(/{{LOGO}}/g, state.settings.logo ? `<img src="${state.settings.logo}" alt="Logo" class="logo">` : '');
 
-  // Diğer tüm dinamik alanları doldurma
   htmlContent = htmlContent
     .replace(/{{COMPANY_NAME}}/g, state.settings.companyName)
     .replace(/{{COMPANY_PHONE}}/g, state.settings.companyPhone)
     .replace(/{{COMPANY_ADDRESS}}/g, companyAddressFormatted)
     .replace(/{{BUILDING_NAME}}/g, building.name)
-    .replace(/{{DATE}}/g, currentDateOnly) // Sadece tarih, saat yok
+    .replace(/{{DATE}}/g, currentDateOnly) 
     .replace(/{{MAINTENANCE_FEE_CALCULATED}}/g, `${maintenanceFeeCalculated.toLocaleString('tr-TR')} ₺`)
     .replace(/{{TECHNICIAN_NAME}}/g, technician)
     .replace(/{{PARTS_SECTION}}/g, partsSectionHtml)
-    // Borç bölümünü tamamen kaldırıldığı için DEBT_SECTION yer tutucusu boş string ile değiştirildi
     .replace(/{{DEBT_SECTION}}/g, '') 
-    .replace(/{{MAINTENANCE_NOTE_SECTION}}/g, maintenanceNoteSectionHtml) // Bakım notu bölümünü ekle
+    .replace(/{{MAINTENANCE_NOTE_SECTION}}/g, maintenanceNoteSectionHtml) 
     .replace(/{{FINAL_TOTAL_AMOUNT}}/g, `${finalTotalAmount.toLocaleString('tr-TR')} ₺`)
-    .replace(/{{BUILDING_CURRENT_DEBT_SECTION}}/g, buildingCurrentDebtSectionHtml); // Binanın güncel borcu bölümünü ekle
+    .replace(/{{BUILDING_CURRENT_DEBT_SECTION}}/g, buildingCurrentDebtSectionHtml); 
 
   return htmlContent;
 }
 
-// Belirli bir bina için en son arşivlenmiş bakım fişinin HTML içeriğini döndürür
 function getLatestArchivedReceiptHtml(buildingId: string, state: AppState): string | null {
     const latestReceipt = state.archivedReceipts
         .filter(ar => ar.buildingId === buildingId)
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-        .shift(); // En sonuncu fişi alır
+        .shift(); 
 
     return latestReceipt ? latestReceipt.htmlContent : null;
 }
@@ -1578,7 +1586,7 @@ const AppContext = createContext<{
   addIncome: (income: Omit<Income, 'id'>) => void;
   setUser: (name: string) => void;
   deleteUser: (id: string) => void;
-  addNotification: (notification: string) => void;
+  addNotification: (notification: AppNotificationData) => void; // Updated to take NotificationData
   clearNotifications: () => void;
   toggleSidebar: () => void;
   toggleMaintenance: (buildingId: string, showReceipt?: boolean) => void;
@@ -1612,15 +1620,82 @@ const AppContext = createContext<{
   showPrinterSelection: (content: string) => void;
   closePrinterSelection: () => void;
   increasePrices: (percentage: number) => void;
-  showArchivedReceipt: (receiptId: string) => void; // Arşivlenmiş fişi gösterme fonksiyonu
-  removeMaintenanceStatusMark: (buildingId: string) => void; // Bakım işaretini kaldırma fonksiyonu
-  cancelMaintenance: (buildingId: string) => void; // Bakımı iptal etme fonksiyonu
-  revertMaintenance: (buildingId: string) => void; // Bakımı geri alma fonksiyonu
-  getLatestArchivedReceiptHtml: (buildingId: string) => string | null; // En son arşivlenmiş fiş HTML'ini getirme fonksiyonu
+  showArchivedReceipt: (receiptId: string) => void; 
+  removeMaintenanceStatusMark: (buildingId: string) => void; 
+  cancelMaintenance: (buildingId: string) => void; 
+  revertMaintenance: (buildingId: string) => void; 
+  getLatestArchivedReceiptHtml: (buildingId: string) => string | null; 
 } | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(appReducer, initialState);
+  const authReady = useRef(false); // To track if auth state has been checked
+
+  useEffect(() => {
+    if (!app || !db || !auth) {
+      console.warn("Firebase is not initialized. Notifications will not be persistent.");
+      return;
+    }
+
+    // Authenticate user
+    const setupAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+        console.log("Firebase Authentication successful.");
+      } catch (error) {
+        console.error("Firebase Authentication failed:", error);
+      }
+    };
+
+    setupAuth();
+
+    // Listen for auth state changes and then set up Firestore listeners
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        // User is signed in. Now we can set up Firestore listeners.
+        authReady.current = true;
+        const userId = user.uid;
+        console.log("User authenticated, setting up Firestore listeners for userId:", userId);
+
+        // Set up real-time listener for notifications
+        const notificationsCollectionRef = collection(db, `artifacts/${__app_id}/users/${userId}/notifications`);
+        const unsubscribeNotifications = onSnapshot(notificationsCollectionRef, (snapshot) => {
+          const fetchedNotifications: AppNotificationData[] = [];
+          snapshot.forEach(doc => {
+            const data = doc.data() as AppNotificationData;
+            fetchedNotifications.push({ ...data, id: doc.id }); // Add id from doc
+          });
+          // Sort by timestamp if desired (latest first)
+          fetchedNotifications.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+          dispatch({ type: 'SET_NOTIFICATIONS_FROM_DB', payload: fetchedNotifications });
+          console.log("Notifications fetched from DB:", fetchedNotifications);
+        }, (error) => {
+          console.error("Error listening to notifications:", error);
+        });
+
+        // Return unsubscribe function for cleanup
+        return () => {
+          console.log("Unsubscribing from notifications listener.");
+          unsubscribeNotifications();
+        };
+
+      } else {
+        // User is signed out. Clear notifications.
+        authReady.current = true;
+        dispatch({ type: 'SET_NOTIFICATIONS_FROM_DB', payload: [] });
+        console.log("User signed out.");
+      }
+    });
+
+    // Cleanup auth listener on component unmount
+    return () => {
+      unsubscribeAuth();
+    };
+  }, []); // Empty dependency array means this effect runs once on mount
 
   const addBuilding = (building: Omit<Building, 'id'>) => {
     dispatch({ type: 'ADD_BUILDING', payload: building });
@@ -1674,13 +1749,52 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     dispatch({ type: 'DELETE_USER', payload: id });
   };
 
-  const addNotification = (notification: string) => {
-    console.log("Adding notification (AppProvider):", notification); // addNotification içinde log
-    dispatch({ type: 'ADD_NOTIFICATION', payload: notification });
+  // Modified addNotification to save to Firestore
+  const addNotification = async (notification: AppNotificationData) => {
+    if (db && authReady.current && auth.currentUser) {
+      try {
+        const userId = auth.currentUser.uid;
+        const notificationsCollectionRef = collection(db, `artifacts/${__app_id}/users/${userId}/notifications`);
+        await addDoc(notificationsCollectionRef, {
+          ...notification,
+          timestamp: new Date().toISOString(), // Ensure timestamp is set
+          userId: userId, // Ensure userId is set
+        });
+        console.log("Notification added to Firestore:", notification.message);
+      } catch (error) {
+        console.error("Error adding notification to Firestore:", error);
+      }
+    } else {
+      console.warn("Firestore not ready or user not authenticated to add notification.");
+      // Optionally, dispatch to local state if Firestore is not available, but it won't persist.
+      dispatch({ type: 'ADD_NOTIFICATION_LOCAL', payload: notification });
+    }
   };
 
-  const clearNotifications = () => {
-    dispatch({ type: 'CLEAR_NOTIFICATIONS' });
+  // Modified clearNotifications to delete from Firestore
+  const clearNotifications = async () => {
+    if (db && authReady.current && auth.currentUser) {
+      try {
+        const userId = auth.currentUser.uid;
+        const notificationsCollectionRef = collection(db, `artifacts/${__app_id}/users/${userId}/notifications`);
+        const q = query(notificationsCollectionRef); // Get all documents in the collection
+        const snapshot = await getDocs(q); // Fetch the documents
+
+        const batch = writeBatch(db);
+        snapshot.docs.forEach((d) => {
+          batch.delete(d.ref); // Add each document to the batch for deletion
+        });
+        await batch.commit(); // Commit the batch deletion
+
+        console.log("Notifications cleared from Firestore.");
+        dispatch({ type: 'CLEAR_NOTIFICATIONS' }); // Clear local state after DB is cleared
+      } catch (error) {
+        console.error("Error clearing notifications from Firestore:", error);
+      }
+    } else {
+      console.warn("Firestore not ready or user not authenticated to clear notifications.");
+      dispatch({ type: 'CLEAR_NOTIFICATIONS' }); // Clear local state without DB sync
+    }
   };
 
   const toggleSidebar = () => {
@@ -1821,7 +1935,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     dispatch({ type: 'INCREASE_PRICES', payload: percentage });
   };
 
-  // Yeni eklenen aksiyonlar
   const showArchivedReceipt = (receiptId: string) => {
     dispatch({ type: 'SHOW_ARCHIVED_RECEIPT', payload: receiptId });
   };
@@ -1893,12 +2006,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         showPrinterSelection,
         closePrinterSelection,
         increasePrices,
-        // Yeni eklenen aksiyonları buraya da ekle
         showArchivedReceipt,
         removeMaintenanceStatusMark,
         cancelMaintenance,
-        revertMaintenance, // Yeni eklenen fonksiyon
-        getLatestArchivedReceiptHtml: getLatestArchivedReceiptHtmlMemoized, // Yeni eklenen yardımcı fonksiyon
+        revertMaintenance,
+        getLatestArchivedReceiptHtml: getLatestArchivedReceiptHtmlMemoized,
       }}
     >
       {children}
