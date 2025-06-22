@@ -10,7 +10,7 @@ import QRCodeManager from '../components/QRCodeManager';
 import { useAutoSave } from '../hooks/useAutoSave';
 
 const BuildingsPage: React.FC = () => {
-  const { state, addBuilding, deleteBuilding, toggleMaintenance, reportFault, addQRCodeData } = useApp();
+  const { state, addBuilding, deleteBuilding, toggleMaintenance, reportFault, addQRCodeData, revertMaintenance, getLatestArchivedReceiptHtml } = useApp();
   const [activeTab, setActiveTab] = useState<'all' | 'maintained' | 'unmaintained'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [labelFilter, setLabelFilter] = useState<'all' | 'green' | 'blue' | 'yellow' | 'red' | 'none'>('all');
@@ -167,12 +167,24 @@ const BuildingsPage: React.FC = () => {
     setShowDeleteConfirm(null);
   };
 
-  const handleMaintenanceToggle = (buildingId: string, showReceipt: boolean = false) => {
-    const building = state.buildings.find(b => b.id === buildingId);
-    
-    // If building is being marked as defective, show fault modal
-    
-    toggleMaintenance(buildingId, showReceipt);
+  const handleMaintenanceAction = (buildingId: string, actionType: 'toggle' | 'revert' | 'showReceipt') => {
+    if (actionType === 'toggle') {
+      toggleMaintenance(buildingId, true); // Always show receipt for a new maintenance action
+    } else if (actionType === 'revert') {
+      revertMaintenance(buildingId);
+    } else if (actionType === 'showReceipt') {
+      const receiptHtml = getLatestArchivedReceiptHtml(buildingId);
+      if (receiptHtml) {
+        state.showReceiptModal = true;
+        state.receiptModalHtml = receiptHtml;
+      } else {
+        // Optionally, if no archived receipt, you might generate a new one
+        const building = state.buildings.find(b => b.id === buildingId);
+        if (building) {
+          toggleMaintenance(buildingId, true);
+        }
+      }
+    }
     setShowMaintenanceOptions(null);
   };
 
@@ -629,19 +641,41 @@ const BuildingsPage: React.FC = () => {
               Bakım işlemini nasıl tamamlamak istiyorsunuz?
             </p>
             <div className="space-y-3">
-              <button
-                onClick={() => handleMaintenanceToggle(showMaintenanceOptions, false)}
-                className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
-              >
-                <Check className="h-5 w-5 mr-2" />
-                Sadece İşaretle
-              </button>
-              <button
-                onClick={() => handleMaintenanceToggle(showMaintenanceOptions, true)}
-                className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
-              >
-                Bakım Fişi Göster
-              </button>
+              {state.buildings.find(b => b.id === showMaintenanceOptions)?.isMaintained ? (
+                // If building is maintained
+                <>
+                  <button
+                    onClick={() => handleMaintenanceAction(showMaintenanceOptions, 'revert')}
+                    className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700"
+                  >
+                    <X className="h-5 w-5 mr-2" />
+                    Bakımı Geri Al
+                  </button>
+                  <button
+                    onClick={() => handleMaintenanceAction(showMaintenanceOptions, 'showReceipt')}
+                    className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+                  >
+                    Bakım Fişi Göster
+                  </button>
+                </>
+              ) : (
+                // If building is not maintained
+                <>
+                  <button
+                    onClick={() => handleMaintenanceAction(showMaintenanceOptions, 'toggle')}
+                    className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Check className="h-5 w-5 mr-2" />
+                    Sadece İşaretle
+                  </button>
+                  <button
+                    onClick={() => handleMaintenanceAction(showMaintenanceOptions, 'showReceipt')}
+                    className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+                  >
+                    Bakım Fişi Oluştur ve Göster
+                  </button>
+                </>
+              )}
               <button
                 onClick={() => setShowMaintenanceOptions(null)}
                 className="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
