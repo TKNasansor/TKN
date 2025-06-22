@@ -1819,7 +1819,8 @@ export const useApp = () => {
     throw new Error('useApp must be used within an AppProvider');
   }
   return context;
-}import React, { useState } from 'react';
+};
+import React, { useState } from 'react';
 import { useApp } from '../context/AppContext'; // AppContext.tsx'den useApp hook'unu import ettiğinizi varsayıyorum.
 // Eğer useApp hook'unuz yoksa, useContext(AppContext) kullanarak dispatch ve state'e erişebilirsiniz.
 
