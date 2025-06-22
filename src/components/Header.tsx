@@ -37,6 +37,8 @@ const Header: React.FC = () => {
       document.removeEventListener('click', handleClickOutside);
     };
   }, []);
+
+  console.log('Header state:', state.notifications, state.unreadNotifications); // Konsol logu eklendi
   
   return (
     <header className="bg-white shadow-sm z-10">
