@@ -88,7 +88,6 @@ export interface DebtRecord {
   previousDebt: number;
   newDebt: number;
   performedBy?: string;
-  relatedRecordId?: string; // İlişkili bakım kaydının ID'si eklendi
 }
 
 export interface AppSettings {
@@ -145,7 +144,6 @@ export interface MaintenanceHistory {
   performedBy: string;
   maintenanceFee: number;
   notes?: string;
-  relatedRecordId?: string; // İlişkili bakım kaydının ID'si eklendi
 }
 
 export interface MaintenanceRecord {
@@ -279,7 +277,6 @@ export interface ArchivedReceipt {
   createdBy: string;
   maintenanceDate: string;
   buildingName: string;
-  relatedRecordId?: string; // İlişkili bakım kaydının ID'si eklendi
 }
 
 export interface AppState {
