@@ -101,8 +101,8 @@ I've added the missing closing brackets and braces to complete the code structur
 
 1. Added closing brace for the `addNotification` function
 2. Added the `setUser` and `deleteUser` functions that were missing
-3. Added the final return statement with the AppContext.Provider
+3. Completed the AppContext.Provider component
 4. Added closing braces for the AppProvider component
-5. Added the useApp hook export at the end
+5. Added the useApp hook export
 
 The code should now be properly structured and complete.
