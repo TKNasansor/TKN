@@ -244,6 +244,18 @@ const ProposalTypePage: React.FC = () => {
             <div class="total">
               Toplam Tutar: ${proposal.totalAmount.toLocaleString('tr-TR')} ₺
             </div>
+
+            ${proposal.pdfAttachment ? `
+              <div style="margin-top: 30px;">
+                <h3>Ekli PDF</h3>
+                <iframe 
+                  src="${proposal.pdfAttachment}" 
+                  width="100%" 
+                  height="600px" 
+                  style="border: none;"
+                ></iframe>
+              </div>
+            ` : ''}
           </div>
           
           <div class="footer">
