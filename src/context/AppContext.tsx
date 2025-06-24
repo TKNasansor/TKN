@@ -11,32 +11,48 @@ import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged }
 import { getFirestore, doc, collection, query, onSnapshot, addDoc, deleteDoc, writeBatch, getDocs } from 'firebase/firestore';
 
 // Global variables provided by the Canvas environment (If applicable)
-declare const __app_id: string;
-declare const __firebase_config: string;
-declare const __initial_auth_token: string;
+declare const __app_id: string | undefined;
+declare const __firebase_config: string | undefined;
+declare const __initial_auth_token: string | undefined;
 
 // Firebase'i bileşen dışında başlatın, böylece her render'da yeniden başlatılmaz
-const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+let firebaseConfig = {};
+try {
+  if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+    firebaseConfig = JSON.parse(__firebase_config);
+  }
+} catch (error) {
+  console.warn("Failed to parse Firebase config:", error);
+  firebaseConfig = {};
+}
+
 let app: any;
 let db: any;
 let auth: any;
+let isFirebaseAvailable = false;
 
 // Uygulama daha önce başlatılmadıysa Firebase'i başlat
-if (Object.keys(firebaseConfig).length > 0 && typeof window !== 'undefined' && !window.firebaseApp) {
+if (Object.keys(firebaseConfig).length > 0 && typeof window !== 'undefined' && !(window as any).firebaseApp) {
   try {
     app = initializeApp(firebaseConfig);
     db = getFirestore(app);
     auth = getAuth(app);
     (window as any).firebaseApp = app; // Global pencereye kaydederek tekrar başlatmayı önle
+    isFirebaseAvailable = true;
     console.log("Firebase initialized successfully.");
   } catch (error) {
     console.error("Firebase initialization failed:", error);
+    isFirebaseAvailable = false;
     // Hata durumunda sistem bildirimi gönderilebilir (aşağıdaki addSystemNotification kullanılarak)
   }
 } else if (typeof window !== 'undefined' && (window as any).firebaseApp) {
   app = (window as any).firebaseApp;
   db = getFirestore(app);
   auth = getAuth(app);
+  isFirebaseAvailable = true;
+} else {
+  console.warn("Firebase configuration not available. Running in offline mode.");
+  isFirebaseAvailable = false;
 }
 
 const initialState: AppState = {
@@ -1623,93 +1639,147 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   useEffect(() => {
     // Firebase uygulamasının ve servislerinin doğru bir şekilde başlatıldığından emin olun
-    if (!app || !db || !auth) {
+    if (!isFirebaseAvailable || !app || !db || !auth) {
       console.error("Firebase is not initialized. Notifications and persistent data will not work. Please check firebaseConfig.");
-      addSystemNotification({
-        id: uuidv4(),
-        message: "Firebase başlatılamadı. Uygulama verileri kalıcı olmayabilir. Lütfen Firebase yapılandırmanızı kontrol edin.",
-        timestamp: new Date().toISOString(),
-        type: 'error',
-        severity: 'high',
-        actionRequired: true,
-        userId: 'system' // Current user olmayabilir, 'system' olarak işaretle
-      });
+      // Only add system notification if we have the function available
+      if (typeof addSystemNotification === 'function') {
+        addSystemNotification({
+          id: uuidv4(),
+          message: "Firebase başlatılamadı. Uygulama offline modda çalışıyor. Veriler kalıcı olmayacak.",
+          timestamp: new Date().toISOString(),
+          type: 'warning',
+          severity: 'medium',
+          actionRequired: false,
+          userId: 'system' // Current user olmayabilir, 'system' olarak işaretle
+        });
+      }
       return;
     }
 
     // Kullanıcı kimlik doğrulamasını ayarla
     const setupAuth = async () => {
       try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token && auth) {
           await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
+        } else if (auth) {
           await signInAnonymously(auth);
         }
         console.log("Firebase Authentication successful.");
       } catch (error: any) {
         console.error("Firebase Authentication failed:", error);
-        addSystemNotification({
-          id: uuidv4(),
-          message: `Firebase kimlik doğrulaması başarısız oldu: ${error.message}`,
-          timestamp: new Date().toISOString(),
-          type: 'error',
-          severity: 'high',
-          actionRequired: true,
-          userId: 'system'
-        });
-      }
-    };
-
-    setupAuth();
-
-    // Kimlik doğrulama durum değişikliklerini dinle ve Firestore dinleyicilerini ayarla
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        authReady.current = true;
-        const userId = user.uid;
-        console.log("User authenticated, setting up Firestore listeners for userId:", userId);
-        
-        // Kullanıcının adını state'e ayarla (eğer henüz ayarlanmadıysa)
-        if (!state.currentUser || state.currentUser.name !== user.displayName) {
-          dispatch({ type: 'SET_USER', payload: user.displayName || user.email || userId });
-        }
-
-
-        // Bildirimler için gerçek zamanlı dinleyiciyi ayarla
-        const notificationsCollectionRef = collection(db, `artifacts/${__app_id}/users/${userId}/notifications`);
-        const unsubscribeNotifications = onSnapshot(notificationsCollectionRef, (snapshot) => {
-          const fetchedNotifications: AppNotificationData[] = [];
-          snapshot.forEach(doc => {
-            const data = doc.data() as AppNotificationData;
-            fetchedNotifications.push({ ...data, id: doc.id });
-          });
-          fetchedNotifications.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-          dispatch({ type: 'SET_NOTIFICATIONS_FROM_DB', payload: fetchedNotifications });
-          console.log("Notifications fetched from DB:", fetchedNotifications);
-        }, (error) => {
-          console.error("Error listening to notifications:", error);
+        if (typeof addSystemNotification === 'function') {
           addSystemNotification({
             id: uuidv4(),
-            message: `Bildirimler yüklenirken hata oluştu: ${error.message}`,
+            message: `Firebase kimlik doğrulaması başarısız oldu: ${error.message}`,
             timestamp: new Date().toISOString(),
             type: 'error',
             severity: 'high',
             actionRequired: true,
-            userId: userId
+            userId: 'system'
           });
+        }
+      }
+    };
+
+    // Only setup auth if Firebase is available
+    if (isFirebaseAvailable && auth) {
+      setupAuth();
+    }
+
+    // Kimlik doğrulama durum değişikliklerini dinle ve Firestore dinleyicilerini ayarla
+    let unsubscribeAuth: (() => void) | undefined;
+    
+    if (isFirebaseAvailable && auth) {
+      unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+        if (user) {
+          authReady.current = true;
+          const userId = user.uid;
+          console.log("User authenticated, setting up Firestore listeners for userId:", userId);
+          
+          // Kullanıcının adını state'e ayarla (eğer henüz ayarlanmadıysa)
+          if (!state.currentUser || state.currentUser.name !== user.displayName) {
+            dispatch({ type: 'SET_USER', payload: user.displayName || user.email || userId });
+          }
+
+          // Bildirimler için gerçek zamanlı dinleyiciyi ayarla (sadece __app_id mevcutsa)
+          if (typeof __app_id !== 'undefined' && __app_id && db) {
+            const notificationsCollectionRef = collection(db, `artifacts/${__app_id}/users/${userId}/notifications`);
+            const unsubscribeNotifications = onSnapshot(notificationsCollectionRef, (snapshot) => {
+              const fetchedNotifications: AppNotificationData[] = [];
+              snapshot.forEach(doc => {
+                const data = doc.data() as AppNotificationData;
+                fetchedNotifications.push({ ...data, id: doc.id });
+              });
+              fetchedNotifications.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+              dispatch({ type: 'SET_NOTIFICATIONS_FROM_DB', payload: fetchedNotifications });
+              console.log("Notifications fetched from DB:", fetchedNotifications);
+            }, (error) => {
+              console.error("Error listening to notifications:", error);
+              if (typeof addSystemNotification === 'function') {
+                addSystemNotification({
+                  id: uuidv4(),
+                  message: `Bildirimler yüklenirken hata oluştu: ${error.message}`,
+                  timestamp: new Date().toISOString(),
+                  type: 'error',
+                  severity: 'high',
+                  actionRequired: true,
+                  userId: userId
+                });
+              }
+            });
+
+            // Cleanup fonksiyonunu döndür
+            return () => {
+              console.log("Unsubscribing from notifications listener.");
+              unsubscribeNotifications();
+            };
+          }
+
+        } else {
+          // Kullanıcı oturumu kapattı. Bildirimleri temizle.
+          authReady.current = true;
+          dispatch({ type: 'SET_NOTIFICATIONS_FROM_DB', payload: [] });
+          console.log("User signed out.");
+        }
+      });
+    } else {
+      // Firebase kullanılamıyor, offline modda çalış
+      authReady.current = true;
+      console.log("Firebase not available, running in offline mode.");
+    }
+
+    // Bileşen kaldırıldığında auth dinleyicisini temizle
+    return () => {
+      if (unsubscribeAuth) {
+        unsubscribeAuth();
+      }
+    };
+  }, []); // Boş bağımlılık dizisi, bu efektin yalnızca bileşen yüklendiğinde bir kez çalışacağı anlamına gelir
+@@ .. @@
+  const addNotification = async (notification: AppNotificationData) => {
+    if (isFirebaseAvailable && db && authReady.current && auth.currentUser && typeof __app_id !== 'undefined' && __app_id) {
+      try {
+        const userId = auth.currentUser.uid;
+        const notificationsCollectionRef = collection(db, `artifacts/${__app_id}/users/${userId}/notifications`);
+        await addDoc(notificationsCollectionRef, {
+          ...notification,
+          timestamp: new Date().toISOString(),
+          userId: userId,
         });
-
-        // Cleanup fonksiyonunu döndür
-        return () => {
-          console.log("Unsubscribing from notifications listener.");
-          unsubscribeNotifications();
-        };
-
-      } else {
-        // Kullanıcı oturumu kapattı. Bildirimleri temizle.
-        authReady.current = true;
-        dispatch({ type: 'SET_NOTIFICATIONS_FROM_DB', payload: [] });
-        console.log("User signed out.");
+        console.log("Notification added to Firestore:", notification.message);
+      } catch (error: any) {
+        console.error("Error adding notification to Firestore:", error);
+        if (typeof addSystemNotification === 'function') {
+          addSystemNotification({
+            id: uuidv4(),
+            message: `Bildirim Firestore'a kaydedilirken hata oluştu: ${error.message}`,
+            timestamp: new Date().toISOString(),
+            type: 'error',
+            severity: 'high',
+            actionRequired: false,
+            userId: state.currentUser?.uid || 'system'
+          });
+        }
       }
     });
 
@@ -1765,48 +1835,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     dispatch({ type: 'ADD_INCOME', payload: income });
   };
 
-  const setUser = (name: string) => {
-    dispatch({ type: 'SET_USER', payload: name });
-  };
-
-  const deleteUser = (id: string) => {
-    dispatch({ type: 'DELETE_USER', payload: id });
-  };
-
-  const addNotification = async (notification: AppNotificationData) => {
-    if (db && authReady.current && auth.currentUser) {
-      try {
-        const userId = auth.currentUser.uid;
-        const notificationsCollectionRef = collection(db, `artifacts/${__app_id}/users/${userId}/notifications`);
-        await addDoc(notificationsCollectionRef, {
-          ...notification,
-          timestamp: new Date().toISOString(),
-          userId: userId,
-        });
-        console.log("Notification added to Firestore:", notification.message);
-      } catch (error: any) {
-        console.error("Error adding notification to Firestore:", error);
+    } else {
+      console.warn("Firestore not ready or user not authenticated to add notification. Adding locally.");
+      if (typeof addSystemNotification === 'function') {
         addSystemNotification({
           id: uuidv4(),
-          message: `Bildirim Firestore'a kaydedilirken hata oluştu: ${error.message}`,
+          message: "Firebase kullanılamıyor. Uygulama offline modda çalışıyor.",
           timestamp: new Date().toISOString(),
-          type: 'error',
-          severity: 'high',
+          type: 'info',
+          severity: 'low',
           actionRequired: false,
           userId: state.currentUser?.uid || 'system'
         });
       }
-    } else {
-      console.warn("Firestore not ready or user not authenticated to add notification. Adding locally.");
-      addSystemNotification({
-        id: uuidv4(),
-        message: "Firebase veya kullanıcı kimlik doğrulaması hazır değil. Bildirim kalıcı olarak kaydedilemedi.",
-        timestamp: new Date().toISOString(),
-        type: 'warning',
-        severity: 'medium',
-        actionRequired: false,
-        userId: state.currentUser?.uid || 'system'
-      });
       // Fallback: Firestore yoksa lokal duruma ekle (kalıcı olmaz)
       dispatch({ type: 'ADD_NOTIFICATION_LOCAL', payload: notification });
     }
@@ -1814,7 +1855,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
 
   const clearNotifications = async () => {
-    if (db && authReady.current && auth.currentUser) {
+    if (isFirebaseAvailable && db && authReady.current && auth.currentUser && typeof __app_id !== 'undefined' && __app_id) {
       try {
         const userId = auth.currentUser.uid;
         const notificationsCollectionRef = collection(db, `artifacts/${__app_id}/users/${userId}/notifications`);
@@ -1831,7 +1872,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         dispatch({ type: 'CLEAR_NOTIFICATIONS' });
       } catch (error: any) {
         console.error("Error clearing notifications from Firestore:", error);
-        addSystemNotification({
+        if (typeof addSystemNotification === 'function') {
+          addSystemNotification({
           id: uuidv4(),
           message: `Bildirimler temizlenirken hata oluştu: ${error.message}`,
           timestamp: new Date().toISOString(),
@@ -1839,19 +1881,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           severity: 'high',
           actionRequired: false,
           userId: state.currentUser?.uid || 'system'
-        });
+          });
+        }
       }
     } else {
       console.warn("Firestore not ready or user not authenticated to clear notifications. Clearing locally.");
-      addSystemNotification({
-        id: uuidv4(),
-        message: "Firebase veya kullanıcı kimlik doğrulaması hazır değil. Bildirimler temizlenemedi.",
-        timestamp: new Date().toISOString(),
-        type: 'warning',
-        severity: 'medium',
-        actionRequired: false,
-        userId: state.currentUser?.uid || 'system'
-      });
+      if (typeof addSystemNotification === 'function') {
+        addSystemNotification({
+          id: uuidv4(),
+          message: "Firebase kullanılamıyor. Bildirimler sadece locally temizlendi.",
+          timestamp: new Date().toISOString(),
+          type: 'info',
+          severity: 'low',
+          actionRequired: false,
+          userId: state.currentUser?.uid || 'system'
+        });
+      }
       dispatch({ type: 'CLEAR_NOTIFICATIONS' }); // Lokal temizleme
     }
   };
@@ -1869,7 +1914,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const faultBuilding = state.buildings.find(b => b.id === buildingId);
     if (!faultBuilding) {
-        addSystemNotification({
+        if (typeof addSystemNotification === 'function') {
+          addSystemNotification({
             id: uuidv4(),
             message: `Arıza bildirimi yapılamadı: Bina bulunamadı (ID: ${buildingId}).`,
             timestamp: new Date().toISOString(),
@@ -1877,13 +1923,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             severity: 'medium',
             actionRequired: false,
             userId: state.currentUser?.uid || 'system'
-        });
+          });
+        }
         return;
     }
 
     const notificationMessage = `${faultBuilding.name} binasında arıza bildirildi (${faultData.severity === 'high' ? 'Yüksek' : faultData.severity === 'medium' ? 'Orta' : 'Düşük'} öncelik)`;
     
-    if (db && authReady.current && auth.currentUser) {
+    if (isFirebaseAvailable && db && authReady.current && auth.currentUser && typeof __app_id !== 'undefined' && __app_id) {
       try {
         const notificationsCollectionRef = collection(db, `artifacts/${__app_id}/users/${auth.currentUser.uid}/notifications`);
         await addDoc(notificationsCollectionRef, {
@@ -1898,7 +1945,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         console.log("Arıza bildirimi Firestore'a başarıyla eklendi.");
       } catch (error: any) {
         console.error("Arıza bildirimi Firestore'a eklenirken hata oluştu:", error);
-        addSystemNotification({
+        if (typeof addSystemNotification === 'function') {
+          addSystemNotification({
           id: uuidv4(),
           message: `Arıza bildirimi Firestore'a kaydedilirken hata oluştu: ${error.message}`,
           timestamp: new Date().toISOString(),
@@ -1907,19 +1955,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           actionRequired: true,
           relatedId: buildingId,
           userId: state.currentUser?.uid || 'unknown'
-        });
+          });
+        }
       }
     } else {
       console.warn("Firestore hazır değil veya kullanıcı kimlik doğrulanmadı. Arıza bildirimi Firestore'a kaydedilemedi.");
-      addSystemNotification({
+      if (typeof addSystemNotification === 'function') {
+        addSystemNotification({
         id: uuidv4(),
-        message: "Firebase başlatılamadı veya kullanıcı doğrulanmadı. Arıza bildirimi kalıcı olarak kaydedilemedi.",
+          message: "Firebase kullanılamıyor. Arıza bildirimi sadece locally kaydedildi.",
         timestamp: new Date().toISOString(),
-        type: 'error',
-        severity: 'high',
-        actionRequired: true,
+          type: 'info',
+          severity: 'low',
+          actionRequired: false,
         userId: state.currentUser?.uid || 'unknown'
-      });
+        });
+      }
     }
   };
 
@@ -1944,7 +1995,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       } 
     });
 
-    if (db && authReady.current && auth.currentUser) {
+    if (isFirebaseAvailable && db && authReady.current && auth.currentUser && typeof __app_id !== 'undefined' && __app_id) {
       try {
         const notificationsCollectionRef = collection(db, `artifacts/${__app_id}/users/${auth.currentUser.uid}/notifications`);
         await addDoc(notificationsCollectionRef, {
@@ -1959,7 +2010,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         console.log("Formdan arıza bildirimi Firestore'a başarıyla eklendi.");
       } catch (error: any) {
         console.error("Formdan arıza bildirimi Firestore'a eklenirken hata oluştu:", error);
-        addSystemNotification({ 
+        if (typeof addSystemNotification === 'function') {
+          addSystemNotification({ 
           id: uuidv4(),
           message: `Formdan arıza bildirimi kaydedilirken hata oluştu: ${error.message}`, 
           timestamp: new Date().toISOString(), 
@@ -1968,19 +2020,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           actionRequired: true, 
           relatedId: buildingId,
           userId: state.currentUser?.uid || 'unknown'
-        });
+          });
+        }
       }
     } else {
       console.warn("Firestore hazır değil veya kullanıcı kimlik doğrulanmadı. Arıza formu Firestore'a kaydedilemedi.");
-      addSystemNotification({ 
+      if (typeof addSystemNotification === 'function') {
+        addSystemNotification({ 
         id: uuidv4(),
-        message: "Firebase başlatılamadı veya kullanıcı doğrulanmadı. Arıza formu kalıcı olarak kaydedilemedi.", 
+          message: "Firebase kullanılamıyor. Arıza formu sadece locally kaydedildi.", 
         timestamp: new Date().toISOString(), 
-        type: 'error', 
-        severity: 'high', 
-        actionRequired: true,
+          type: 'info', 
+          severity: 'low', 
+          actionRequired: false,
         userId: state.currentUser?.uid || 'unknown'
-      });
+        });
+      }
     }
   };
 
