@@ -1,6 +1,105 @@
-Here's the fixed version of the script with all missing closing brackets added:
+import React, { createContext, useContext, useReducer, ReactNode, useMemo } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 
-```typescript
+// This appears to be a partial file that was corrupted with descriptive text
+// I'll need to recreate the proper TypeScript structure based on the visible code
+
+interface AppState {
+  currentUser?: { uid: string };
+  // Add other state properties as needed
+}
+
+interface AppContextType {
+  state: AppState;
+  addBuilding: (building: any) => void;
+  updateBuilding: (id: string, building: any) => void;
+  deleteBuilding: (id: string) => void;
+  addPart: (part: any) => void;
+  updatePart: (id: string, part: any) => void;
+  deletePart: (id: string) => void;
+  addUpdate: (update: any) => void;
+  addIncome: (income: any) => void;
+  setUser: (name: string) => void;
+  deleteUser: (id: string) => void;
+  addNotification: (notification: any) => void;
+  clearNotifications: () => void;
+  toggleSidebar: () => void;
+  toggleMaintenance: () => void;
+  reportFault: (fault: any) => void;
+  updateSettings: (settings: any) => void;
+  resetMaintenanceStatus: () => void;
+  addFaultReport: (report: any) => void;
+  resolveFaultReport: (id: string) => void;
+  addMaintenanceHistory: (history: any) => void;
+  addMaintenanceRecord: (record: any) => void;
+  addPrinter: (printer: any) => void;
+  updatePrinter: (id: string, printer: any) => void;
+  deletePrinter: (id: string) => void;
+  addSMSTemplate: (template: any) => void;
+  updateSMSTemplate: (id: string, template: any) => void;
+  deleteSMSTemplate: (id: string) => void;
+  sendBulkSMS: (data: any) => void;
+  sendWhatsApp: (data: any) => void;
+  addProposal: (proposal: any) => void;
+  updateProposal: (id: string, proposal: any) => void;
+  deleteProposal: (id: string) => void;
+  addPayment: (payment: any) => void;
+  addProposalTemplate: (template: any) => void;
+  updateProposalTemplate: (id: string, template: any) => void;
+  deleteProposalTemplate: (id: string) => void;
+  addQRCodeData: (data: any) => void;
+  updateAutoSaveData: (data: any) => void;
+  showReceiptModal: () => void;
+  closeReceiptModal: () => void;
+  archiveReceipt: () => void;
+  showPrinterSelection: () => void;
+  closePrinterSelection: () => void;
+  increasePrices: () => void;
+  showArchivedReceipt: () => void;
+  removeMaintenanceStatusMark: () => void;
+  cancelMaintenance: () => void;
+  revertMaintenance: () => void;
+  getLatestArchivedReceiptHtml: () => string;
+  addSystemNotification: (notification: any) => void;
+}
+
+const AppContext = createContext<AppContextType | undefined>(undefined);
+
+function appReducer(state: AppState, action: any): AppState {
+  switch (action.type) {
+    case 'SET_USER':
+      return { ...state, currentUser: { uid: action.payload } };
+    case 'DELETE_USER':
+      return { ...state, currentUser: undefined };
+    case 'ADD_NOTIFICATION_LOCAL':
+      return state; // Handle locally
+    default:
+      return state;
+  }
+}
+
+interface AppProviderProps {
+  children: ReactNode;
+}
+
+export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
+  const [state, dispatch] = useReducer(appReducer, {});
+
+  const addSystemNotification = (notification: any) => {
+    console.log('System notification:', notification);
+  };
+
+  const getLatestArchivedReceiptHtmlMemoized = useMemo(() => {
+    return () => '';
+  }, []);
+
+  const addNotification = (notification: any) => {
+    // Check if Firestore is available and user is authenticated
+    const isFirestoreReady = false; // This should be determined by your Firebase setup
+    
+    if (isFirestoreReady && state.currentUser) {
+      console.log("Adding notification to Firestore");
+      // Add your Firestore logic here
     } else {
       console.warn("Firestore not ready or user not authenticated to add notification. Adding locally.");
       if (typeof addSystemNotification === 'function') {
@@ -26,6 +125,53 @@ Here's the fixed version of the script with all missing closing brackets added:
   const deleteUser = (id: string) => {
     dispatch({ type: 'DELETE_USER', payload: id });
   };
+
+  // Stub implementations for all the required methods
+  const addBuilding = (building: any) => console.log('addBuilding', building);
+  const updateBuilding = (id: string, building: any) => console.log('updateBuilding', id, building);
+  const deleteBuilding = (id: string) => console.log('deleteBuilding', id);
+  const addPart = (part: any) => console.log('addPart', part);
+  const updatePart = (id: string, part: any) => console.log('updatePart', id, part);
+  const deletePart = (id: string) => console.log('deletePart', id);
+  const addUpdate = (update: any) => console.log('addUpdate', update);
+  const addIncome = (income: any) => console.log('addIncome', income);
+  const clearNotifications = () => console.log('clearNotifications');
+  const toggleSidebar = () => console.log('toggleSidebar');
+  const toggleMaintenance = () => console.log('toggleMaintenance');
+  const reportFault = (fault: any) => console.log('reportFault', fault);
+  const updateSettings = (settings: any) => console.log('updateSettings', settings);
+  const resetMaintenanceStatus = () => console.log('resetMaintenanceStatus');
+  const addFaultReport = (report: any) => console.log('addFaultReport', report);
+  const resolveFaultReport = (id: string) => console.log('resolveFaultReport', id);
+  const addMaintenanceHistory = (history: any) => console.log('addMaintenanceHistory', history);
+  const addMaintenanceRecord = (record: any) => console.log('addMaintenanceRecord', record);
+  const addPrinter = (printer: any) => console.log('addPrinter', printer);
+  const updatePrinter = (id: string, printer: any) => console.log('updatePrinter', id, printer);
+  const deletePrinter = (id: string) => console.log('deletePrinter', id);
+  const addSMSTemplate = (template: any) => console.log('addSMSTemplate', template);
+  const updateSMSTemplate = (id: string, template: any) => console.log('updateSMSTemplate', id, template);
+  const deleteSMSTemplate = (id: string) => console.log('deleteSMSTemplate', id);
+  const sendBulkSMS = (data: any) => console.log('sendBulkSMS', data);
+  const sendWhatsApp = (data: any) => console.log('sendWhatsApp', data);
+  const addProposal = (proposal: any) => console.log('addProposal', proposal);
+  const updateProposal = (id: string, proposal: any) => console.log('updateProposal', id, proposal);
+  const deleteProposal = (id: string) => console.log('deleteProposal', id);
+  const addPayment = (payment: any) => console.log('addPayment', payment);
+  const addProposalTemplate = (template: any) => console.log('addProposalTemplate', template);
+  const updateProposalTemplate = (id: string, template: any) => console.log('updateProposalTemplate', id, template);
+  const deleteProposalTemplate = (id: string) => console.log('deleteProposalTemplate', id);
+  const addQRCodeData = (data: any) => console.log('addQRCodeData', data);
+  const updateAutoSaveData = (data: any) => console.log('updateAutoSaveData', data);
+  const showReceiptModal = () => console.log('showReceiptModal');
+  const closeReceiptModal = () => console.log('closeReceiptModal');
+  const archiveReceipt = () => console.log('archiveReceipt');
+  const showPrinterSelection = () => console.log('showPrinterSelection');
+  const closePrinterSelection = () => console.log('closePrinterSelection');
+  const increasePrices = () => console.log('increasePrices');
+  const showArchivedReceipt = () => console.log('showArchivedReceipt');
+  const removeMaintenanceStatusMark = () => console.log('removeMaintenanceStatusMark');
+  const cancelMaintenance = () => console.log('cancelMaintenance');
+  const revertMaintenance = () => console.log('revertMaintenance');
 
   return (
     <AppContext.Provider
@@ -95,14 +241,3 @@ export const useApp = () => {
   }
   return context;
 };
-```
-
-I've added the missing closing brackets and braces to complete the code structure. The main fixes were:
-
-1. Added closing brace for the `addNotification` function
-2. Added the `setUser` and `deleteUser` functions that were missing
-3. Completed the AppContext.Provider component
-4. Added closing braces for the AppProvider component
-5. Added the useApp hook export
-
-The code should now be properly structured and complete.
