@@ -1,13 +1,6 @@
 import React, { createContext, useContext, useReducer, ReactNode, useMemo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-
-// This appears to be a partial file that was corrupted with descriptive text
-// I'll need to recreate the proper TypeScript structure based on the visible code
-
-interface AppState {
-  currentUser?: { uid: string };
-  // Add other state properties as needed
-}
+import { AppState, User, AppSettings } from '../types';
 
 interface AppContextType {
   state: AppState;
@@ -65,14 +58,93 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+const defaultAppSettings: AppSettings = {
+  appTitle: 'Asansör Yönetim Sistemi',
+  logo: null,
+  companyName: '',
+  companyPhone: '',
+  companyAddress: {
+    mahalle: '',
+    sokak: '',
+    il: '',
+    ilce: '',
+    binaNo: ''
+  },
+  receiptTemplate: '',
+  installationProposalTemplate: '',
+  maintenanceProposalTemplate: '',
+  revisionProposalTemplate: '',
+  faultReportTemplate: '',
+  autoSaveInterval: 30
+};
+
+const defaultAppState: AppState = {
+  buildings: [],
+  parts: [],
+  partInstallations: [],
+  manualPartInstallations: [],
+  updates: [],
+  incomes: [],
+  currentUser: null,
+  users: [],
+  notifications: [],
+  sidebarOpen: false,
+  settings: defaultAppSettings,
+  faultReports: [],
+  maintenanceReceipts: [],
+  maintenanceHistory: [],
+  maintenanceRecords: [],
+  printers: [],
+  unreadNotifications: 0,
+  smsTemplates: [],
+  proposals: [],
+  payments: [],
+  debtRecords: [],
+  proposalTemplates: [],
+  qrCodes: [],
+  systemNotifications: [],
+  autoSaveData: [],
+  hasUnsavedChanges: false,
+  isAutoSaving: false,
+  showReceiptModal: false,
+  receiptModalHtml: null,
+  archivedReceipts: [],
+  showPrinterSelectionModal: false,
+  printerSelectionContent: null
+};
+
 function appReducer(state: AppState, action: any): AppState {
   switch (action.type) {
-    case 'SET_USER':
-      return { ...state, currentUser: { uid: action.payload } };
+    case 'SET_USER': {
+      const userId = uuidv4();
+      const newUser: User = {
+        id: userId,
+        name: action.payload
+      };
+      
+      // Check if user already exists in users array
+      const existingUserIndex = state.users.findIndex(user => user.name === action.payload);
+      const updatedUsers = existingUserIndex >= 0 
+        ? state.users 
+        : [...state.users, newUser];
+      
+      return { 
+        ...state, 
+        currentUser: newUser,
+        users: updatedUsers
+      };
+    }
     case 'DELETE_USER':
-      return { ...state, currentUser: undefined };
+      return { 
+        ...state, 
+        currentUser: null,
+        users: state.users.filter(user => user.id !== action.payload)
+      };
     case 'ADD_NOTIFICATION_LOCAL':
-      return state; // Handle locally
+      return {
+        ...state,
+        notifications: [...state.notifications, action.payload]
+      };
     default:
       return state;
   }
@@ -83,7 +155,7 @@ interface AppProviderProps {
 }
 
 export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
-  const [state, dispatch] = useReducer(appReducer, {});
+  const [state, dispatch] = useReducer(appReducer, defaultAppState);
 
   const addSystemNotification = (notification: any) => {
     console.log('System notification:', notification);
@@ -110,7 +182,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
           type: 'info',
           severity: 'low',
           actionRequired: false,
-          userId: state.currentUser?.uid || 'system'
+          userId: state.currentUser?.id || 'system'
         });
       }
       // Fallback: Firestore yoksa lokal duruma ekle (kalıcı olmaz)
