@@ -4,7 +4,11 @@ import { AppState, Building, Part, PartInstallation, ManualPartInstallation, Upd
 
 const initialState: AppState = {
   buildings: [],
-  parts: [],
+ parts: [
+  { id: 'part-1', name: 'Motor', quantity: 10, price: 1500 },
+  { id: 'part-2', name: 'Halat', quantity: 50, price: 250 },
+  { id: 'part-3', name: 'Kontrol Kartı', quantity: 5, price: 3000 },
+],
   partInstallations: [],
   manualPartInstallations: [],
   updates: [],
