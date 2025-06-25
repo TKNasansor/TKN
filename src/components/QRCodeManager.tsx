@@ -1,14 +1,25 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { QrCode, Edit, Eye, Printer, X, Save, RefreshCw } from 'lucide-react';
+import { QrCode, Edit, Printer, X, RefreshCw } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+
+// qrContent için TypeScript arayüzü
+interface QRContent {
+  buildingName: string;
+  buildingId: string;
+  contactInfo: string;
+  emergencyPhone: string;
+  customMessage: string;
+}
 
 interface QRCodeManagerProps {
   isOpen: boolean;
   buildingId: string;
   buildingName: string;
   onClose: () => void;
-  onSave: (qrData: any) => void;
+  onSave: (qrData: QRContent & { url: string; logoUrl?: string; companyName?: string; companyPhone?: string }) => void;
 }
 
 const QRCodeManager: React.FC<QRCodeManagerProps> = ({
@@ -16,39 +27,53 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
   buildingId,
   buildingName,
   onClose,
-  onSave
+  onSave,
 }) => {
   const { state, showPrinterSelection } = useApp();
   const [step, setStep] = useState<'edit' | 'preview'>('edit');
-  const [qrContent, setQrContent] = useState({
-    buildingName,
-    buildingId,
-    contactInfo: '',
-    emergencyPhone: '112',
-    customMessage: 'Asansör arızası için QR kodu okutun'
+  const [isQRCodeSaved, setIsQRCodeSaved] = useState(false);
+  const [qrContent, setQrContent] = useState<QRContent>(() => {
+    // localStorage'dan veriyi yükle
+    const savedData = localStorage.getItem(`qrCode_${buildingId}`);
+    if (savedData) {
+      setIsQRCodeSaved(true);
+      return JSON.parse(savedData);
+    }
+    return {
+      buildingName,
+      buildingId,
+      contactInfo: '',
+      emergencyPhone: '112',
+      customMessage: 'Asansör arızası için QR kodu okutun',
+    };
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
-  const [hasSaved, setHasSaved] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
+  // Bileşen açıldığında doğru adımı göster
   useEffect(() => {
-    if (!isOpen) {
-      setStep('edit');
-      setHasSaved(false);
+    if (isOpen) {
+      setStep(isQRCodeSaved ? 'preview' : 'edit');
     }
-  }, [isOpen]);
+  }, [isOpen, isQRCodeSaved]);
 
-  const validateQRContent = () => {
+  const validateQRContent = useCallback(() => {
     const errors: string[] = [];
     if (!qrContent.buildingName.trim()) errors.push('Bina adı zorunludur');
     if (!qrContent.customMessage.trim()) errors.push('Özel mesaj zorunludur');
+    if (qrContent.emergencyPhone && !/^\d{7,}$/.test(qrContent.emergencyPhone)) {
+      errors.push('Acil durum telefonu en az 7 rakam olmalı');
+    }
     setValidationErrors(errors);
     return errors.length === 0;
-  };
+  }, [qrContent.buildingName, qrContent.customMessage, qrContent.emergencyPhone]);
 
   const generateQRCode = async () => {
-    if (!validateQRContent()) return;
+    if (!validateQRContent()) {
+      toast.error('Lütfen tüm zorunlu alanları doldurun ve hataları düzeltin.');
+      return;
+    }
     setIsGenerating(true);
     try {
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -57,14 +82,17 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
         url: `${window.location.origin}/report-fault/${buildingId}`,
         logoUrl: state.settings?.logo,
         companyName: state.settings?.companyName,
-        companyPhone: state.settings?.companyPhone
+        companyPhone: state.settings?.companyPhone,
       };
       onSave(qrData);
+      setIsQRCodeSaved(true);
+      // localStorage'a kaydet
+      localStorage.setItem(`qrCode_${buildingId}`, JSON.stringify(qrContent));
       setStep('preview');
-      setHasSaved(true);
+      toast.success('QR kod başarıyla oluşturuldu!');
     } catch (error) {
       console.error('QR Code generation failed:', error);
-      alert('QR kod oluşturulurken hata oluştu. Lütfen tekrar deneyin.');
+      toast.error('QR kod oluşturulurken hata oluştu. Lütfen tekrar deneyin.');
     } finally {
       setIsGenerating(false);
     }
@@ -101,6 +129,7 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
       </html>
     `;
     showPrinterSelection(printContent);
+    toast.info('Yazdırma ekranı açılıyor...');
   };
 
   if (!isOpen) return null;
@@ -108,6 +137,8 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        {/* ToastContainer bileşeni */}
+        <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} closeOnClick pauseOnHover />
         <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
           <div className="flex items-center">
             <QrCode className="h-6 w-6 text-blue-600 mr-3" />
@@ -116,12 +147,12 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
               <p className="text-sm text-gray-600">{buildingName}</p>
             </div>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600" aria-label="Kapat">
             <X className="h-6 w-6" />
           </button>
         </div>
 
-        {!hasSaved || step === 'edit' ? (
+        {step === 'edit' ? (
           <div className="p-6">
             <div className="mb-6">
               <div className="flex items-center space-x-4 mb-4">
@@ -157,6 +188,8 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
                   onChange={(e) => setQrContent(prev => ({ ...prev, buildingName: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="Bina adını girin"
+                  aria-label="Bina adı"
+                  required
                 />
               </div>
 
@@ -168,6 +201,8 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
                   onChange={(e) => setQrContent(prev => ({ ...prev, customMessage: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="QR kod üzerinde görünecek mesaj"
+                  aria-label="Özel mesaj"
+                  required
                 />
               </div>
 
@@ -180,6 +215,7 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
                     onChange={(e) => setQrContent(prev => ({ ...prev, emergencyPhone: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="112"
+                    aria-label="Acil durum telefonu"
                   />
                 </div>
               </div>
@@ -192,6 +228,7 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
                   onChange={(e) => setQrContent(prev => ({ ...prev, contactInfo: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="Ek iletişim bilgisi (opsiyonel)"
+                  aria-label="İletişim bilgisi"
                 />
               </div>
             </div>
@@ -200,6 +237,7 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
               <button
                 onClick={onClose}
                 className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                aria-label="İptal"
               >
                 İptal
               </button>
@@ -207,6 +245,7 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
                 onClick={generateQRCode}
                 disabled={isGenerating}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                aria-label="QR kod oluştur"
               >
                 {isGenerating ? (
                   <>
@@ -224,6 +263,20 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
           </div>
         ) : (
           <div className="p-6">
+            <div className="mb-6">
+              <div className="flex items-center space-x-4 mb-4">
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 bg-green-600 text-white rounded-full flex items-center justify-center text-sm font-medium">✓</div>
+                  <span className="text-green-600 font-medium">İçerik Düzenlendi</span>
+                </div>
+                <div className="flex-1 h-px bg-gray-300"></div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium">2</div>
+                  <span className="font-medium text-blue-600">Önizleme & Yazdır</span>
+                </div>
+              </div>
+            </div>
+
             <div className="text-center">
               <h3 className="text-lg font-medium text-gray-900 mb-4">QR Kod Önizlemesi</h3>
               <div className="inline-block p-6 border-2 border-gray-300 rounded-lg bg-white">
@@ -263,6 +316,7 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
               <button
                 onClick={() => setStep('edit')}
                 className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center"
+                aria-label="Düzenle"
               >
                 <Edit className="h-4 w-4 mr-2" />
                 Düzenle
@@ -270,6 +324,7 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
               <button
                 onClick={handlePrint}
                 className="px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 flex items-center"
+                aria-label="Yazdır"
               >
                 <Printer className="h-4 w-4 mr-2" />
                 Yazdır
@@ -277,9 +332,10 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
               <button
                 onClick={onClose}
                 className="px-4 py-2 bg-gray-600 text-white rounded-md text-sm font-medium hover:bg-gray-700 flex items-center"
+                aria-label="İptal"
               >
                 <X className="h-4 w-4 mr-2" />
-                Kapat
+                İptal
               </button>
             </div>
           </div>
