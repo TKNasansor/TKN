@@ -262,14 +262,14 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
               </div>
             </div>
 
-            <div className="text-center w-full">
+            <div className="text-center w-full flex flex-col items-center justify-center flex-grow">
               <h3 className="text-base font-semibold text-gray-900 mb-4">QR Kod Önizlemesi</h3>
-              <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200 max-w-xs mx-auto">
+              <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200 max-w-xs mx-auto mb-4">
                 {state.settings?.companyName && (
                   <div className="text-sm font-bold text-gray-900 mb-1">{state.settings.companyName}</div>
                 )}
                 <div className="text-xl font-bold text-gray-900 mb-3">{qrContent.buildingName}</div>
-                <div ref={printRef} className="mb-3 p-2 bg-white border border-gray-200 rounded-md shadow-sm mx-auto">
+                <div ref={printRef} className="mb-3 p-2 bg-white border border-gray-200 rounded-md shadow-sm mx-auto flex items-center justify-center">
                   <QRCodeSVG
                     value={`${window.location.origin}/report-fault/${buildingId}`}
                     size={160}
