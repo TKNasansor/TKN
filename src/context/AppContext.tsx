@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useReducer, ReactNode, useCallback, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import {
   AppState,
@@ -40,7 +40,7 @@ const initialState: AppState = {
   notifications: [],
   sidebarOpen: false,
   settings: {
-    appTitle: 'TKNLİFT',
+    appTitle: 'Asansör Bakım Takip',
     logo: null,
     companyName: 'Asansör Bakım Servisi',
     companyPhone: '0555 123 45 67',
@@ -406,7 +406,9 @@ function appReducer(state: AppState, action: Action): AppState {
       const newUnreadCount = state.unreadNotifications + 1;
 
       if (updatedNotifications.length !== state.notifications.length + 1) {
-        console.warn('Bildirim eklenirken bir hata oluştu, dizi güncellenmedi!');
+        console.error('Bildirim eklenemedi! Dizi güncellenmedi.', { state, action });
+      } else {
+        console.log('Bildirim eklendi:', newNotification, 'Yeni unread count:', newUnreadCount);
       }
 
       return {
@@ -1065,6 +1067,11 @@ const AppContext = createContext<{
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(appReducer, initialState);
 
+  // State değişikliklerini izlemek için debug
+  useEffect(() => {
+    console.log('State güncellendi:', { notifications: state.notifications, unreadNotifications: state.unreadNotifications });
+  }, [state.notifications, state.unreadNotifications]);
+
   const addBuilding = (building: Omit<Building, 'id'>) => dispatch({ type: 'ADD_BUILDING', payload: building });
   const updateBuilding = (building: Building) => dispatch({ type: 'UPDATE_BUILDING', payload: building });
   const deleteBuilding = (id: string) => dispatch({ type: 'DELETE_BUILDING', payload: id });
@@ -1079,11 +1086,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const setUser = (name: string) => dispatch({ type: 'SET_USER', payload: name });
   const deleteUser = (id: string) => dispatch({ type: 'DELETE_USER', payload: id });
   const addNotification = (notification: string) => {
-    console.log(`Yeni bildirim eklendi: ${notification}, unreadNotifications: ${state.unreadNotifications + 1}`);
+    console.log('addNotification çağrıldı:', notification, 'Mevcut state:', state.unreadNotifications);
     dispatch({ type: 'ADD_NOTIFICATION', payload: notification });
   };
   const clearNotifications = () => {
-    console.log('Bildirimler temizleniyor, unreadNotifications sıfırlanıyor.');
+    console.log('clearNotifications çağrıldı, Mevcut state:', state.unreadNotifications);
     dispatch({ type: 'CLEAR_NOTIFICATIONS' });
   };
   const toggleSidebar = () => dispatch({ type: 'TOGGLE_SIDEBAR' });
