@@ -10,8 +10,8 @@ interface QRContent {
   buildingName: string;
   buildingId: string;
   contactInfo: string;
-  emergencyPhone: string;
   customMessage: string;
+  emergencyPhone: string; // Sabit: "112"
 }
 
 interface QRCodeManagerProps {
@@ -37,14 +37,15 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
     const savedData = localStorage.getItem(`qrCode_${buildingId}`);
     if (savedData) {
       setIsQRCodeSaved(true);
-      return JSON.parse(savedData);
+      const parsed = JSON.parse(savedData);
+      return { ...parsed, emergencyPhone: '112' }; // emergencyPhone sabit
     }
     return {
       buildingName,
       buildingId,
       contactInfo: '',
-      emergencyPhone: '112',
       customMessage: 'Asansör arızası için QR kodu okutun',
+      emergencyPhone: '112', // Sabit
     };
   });
   const [isGenerating, setIsGenerating] = useState(false);
@@ -62,12 +63,9 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
     const errors: string[] = [];
     if (!qrContent.buildingName.trim()) errors.push('Bina adı zorunludur');
     if (!qrContent.customMessage.trim()) errors.push('Özel mesaj zorunludur');
-    if (qrContent.emergencyPhone && !/^\d{7,}$/.test(qrContent.emergencyPhone)) {
-      errors.push('Acil durum telefonu en az 7 rakam olmalı');
-    }
     setValidationErrors(errors);
     return errors.length === 0;
-  }, [qrContent.buildingName, qrContent.customMessage, qrContent.emergencyPhone]);
+  }, [qrContent.buildingName, qrContent.customMessage]);
 
   const generateQRCode = async () => {
     if (!validateQRContent()) {
@@ -79,6 +77,7 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
       await new Promise(resolve => setTimeout(resolve, 1000));
       const qrData = {
         ...qrContent,
+        emergencyPhone: '112', // Sabit
         url: `${window.location.origin}/report-fault/${buildingId}`,
         logoUrl: state.settings?.logo,
         companyName: state.settings?.companyName,
@@ -87,7 +86,7 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
       onSave(qrData);
       setIsQRCodeSaved(true);
       // localStorage'a kaydet
-      localStorage.setItem(`qrCode_${buildingId}`, JSON.stringify(qrContent));
+      localStorage.setItem(`qrCode_${buildingId}`, JSON.stringify({ ...qrContent, emergencyPhone: '112' }));
       setStep('preview');
       toast.success('QR kod başarıyla oluşturuldu!');
     } catch (error) {
@@ -107,12 +106,12 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
           <title>QR Kod - ${qrContent.buildingName}</title>
           <style>
             body { font-family: Arial, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
-            .qr-container { text-align: center; border: 2px solid #333; padding: 30px; border-radius: 10px; background: white; }
-            .company-name { font-size: 20px; font-weight: bold; color: #333; margin-bottom: 10px; }
-            .building-name { font-size: 24px; font-weight: bold; margin-bottom: 20px; color: #333; }
-            .qr-code { margin: 20px 0; }
-            .instructions { font-size: 16px; color: #666; margin-top: 20px; max-width: 300px; line-height: 1.5; }
-            .contact-info { margin-top: 20px; font-size: 14px; color: #888; }
+            .qr-container { text-align: center; border: 2px solid #333; padding: 30px; border-radius: 10px; background: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+            .company-name { font-size: 20px; font-weight: bold; color: #1f2937; margin-bottom: 10px; }
+            .building-name { font-size: 24px; font-weight: bold; color: #1f2937; margin-bottom: 20px; }
+            .qr-code { margin: 20px 0; padding: 10px; background: white; border: 1px solid #e5e7eb; border-radius: 8px; }
+            .instructions { font-size: 16px; color: #4b5563; margin-top: 20px; max-width: 300px; line-height: 1.5; }
+            .contact-info { margin-top: 20px; font-size: 14px; color: #6b7280; }
             @media print { .actions { display: none; } }
           </style>
         </head>
@@ -123,7 +122,7 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
             <div class="qr-code">${printRef.current.innerHTML}</div>
             <div class="instructions">${qrContent.customMessage}</div>
             ${state.settings?.companyPhone ? `<div class="contact-info">İletişim: ${state.settings.companyPhone}</div>` : ''}
-            <div class="contact-info">Acil durumlar için: ${qrContent.emergencyPhone}</div>
+            <div class="contact-info">Acil durumlar için: 112</div>
           </div>
         </body>
       </html>
@@ -206,20 +205,6 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Acil Durum Telefonu</label>
-                  <input
-                    type="tel"
-                    value={qrContent.emergencyPhone}
-                    onChange={(e) => setQrContent(prev => ({ ...prev, emergencyPhone: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="112"
-                    aria-label="Acil durum telefonu"
-                  />
-                </div>
-              </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">İletişim Bilgisi</label>
                 <input
@@ -278,13 +263,13 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
             </div>
 
             <div className="text-center">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">QR Kod Önizlemesi</h3>
-              <div className="inline-block p-6 border-2 border-gray-300 rounded-lg bg-white">
+              <h3 className="text-xl font-semibold text-gray-900 mb-6">QR Kod Önizlemesi</h3>
+              <div className="inline-block bg-white p-8 rounded-xl shadow-lg border border-gray-200 max-w-sm mx-auto">
                 {state.settings?.companyName && (
                   <div className="text-lg font-bold text-gray-900 mb-2">{state.settings.companyName}</div>
                 )}
-                <div className="text-xl font-bold text-gray-900 mb-4">{qrContent.buildingName}</div>
-                <div ref={printRef} className="mb-4 relative">
+                <div className="text-2xl font-bold text-gray-900 mb-4">{qrContent.buildingName}</div>
+                <div ref={printRef} className="mb-4 p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
                   <QRCodeSVG
                     value={`${window.location.origin}/report-fault/${buildingId}`}
                     size={200}
@@ -298,24 +283,24 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
                     } : undefined}
                   />
                 </div>
-                <div className="text-sm text-gray-600 max-w-xs mx-auto">
+                <div className="text-sm text-gray-600 max-w-xs mx-auto mb-4 leading-relaxed">
                   {qrContent.customMessage}
                 </div>
                 {state.settings?.companyPhone && (
-                  <div className="text-xs text-gray-500 mt-2">
+                  <div className="text-xs text-gray-500 mb-1">
                     İletişim: {state.settings.companyPhone}
                   </div>
                 )}
-                <div className="text-xs text-gray-500 mt-1">
-                  Acil: {qrContent.emergencyPhone}
+                <div className="text-xs text-gray-500">
+                  Acil: 112
                 </div>
               </div>
             </div>
 
-            <div className="flex justify-center space-x-3 mt-8">
+            <div className="flex justify-center space-x-4 mt-8">
               <button
                 onClick={() => setStep('edit')}
-                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center"
+                className="px-6 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center transition-colors duration-200"
                 aria-label="Düzenle"
               >
                 <Edit className="h-4 w-4 mr-2" />
@@ -323,7 +308,7 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
               </button>
               <button
                 onClick={handlePrint}
-                className="px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 flex items-center"
+                className="px-6 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 flex items-center transition-colors duration-200"
                 aria-label="Yazdır"
               >
                 <Printer className="h-4 w-4 mr-2" />
@@ -331,7 +316,7 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
               </button>
               <button
                 onClick={onClose}
-                className="px-4 py-2 bg-gray-600 text-white rounded-md text-sm font-medium hover:bg-gray-700 flex items-center"
+                className="px-6 py-2 bg-gray-600 text-white rounded-md text-sm font-medium hover:bg-gray-700 flex items-center transition-colors duration-200"
                 aria-label="İptal"
               >
                 <X className="h-4 w-4 mr-2" />
