@@ -40,7 +40,7 @@ const initialState: AppState = {
   notifications: [],
   sidebarOpen: false,
   settings: {
-    appTitle: 'Asansör Bakım Takip',
+    appTitle: 'TKNLİFT', // Değişiklik: Sabit başlık olarak 'TKNLİFT' ayarlandı
     logo: null,
     companyName: 'Asansör Bakım Servisi',
     companyPhone: '0555 123 45 67',
@@ -594,8 +594,11 @@ function appReducer(state: AppState, action: Action): AppState {
       };
     }
 
-    case 'UPDATE_SETTINGS':
-      return { ...state, settings: { ...state.settings, ...action.payload } };
+    case 'UPDATE_SETTINGS': {
+      // Değişiklik: appTitle güncellenmesini engellemek için hariç tutuluyor
+      const { appTitle, ...otherSettings } = action.payload;
+      return { ...state, settings: { ...state.settings, ...otherSettings } };
+    }
 
     case 'RESET_MAINTENANCE_STATUS':
       return {
