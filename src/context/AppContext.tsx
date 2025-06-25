@@ -40,7 +40,7 @@ const initialState: AppState = {
   notifications: [],
   sidebarOpen: false,
   settings: {
-    appTitle: 'Asansör Bakım Takip',
+    appTitle: 'TKNLİFT',
     logo: null,
     companyName: 'Asansör Bakım Servisi',
     companyPhone: '0555 123 45 67',
@@ -400,15 +400,35 @@ function appReducer(state: AppState, action: Action): AppState {
     case 'DELETE_USER':
       return { ...state, users: state.users.filter(u => u.id !== action.payload) };
 
-    case 'ADD_NOTIFICATION':
+    case 'ADD_NOTIFICATION': {
+      const newNotification = action.payload;
+      const updatedNotifications = [newNotification, ...state.notifications];
+      const newUnreadCount = state.unreadNotifications + 1;
+
+      if (updatedNotifications.length !== state.notifications.length + 1) {
+        console.warn('Bildirim eklenirken bir hata oluştu, dizi güncellenmedi!');
+      }
+
       return {
         ...state,
-        notifications: [action.payload, ...state.notifications],
-        unreadNotifications: state.unreadNotifications + 1,
+        notifications: updatedNotifications,
+        unreadNotifications: newUnreadCount,
       };
+    }
 
-    case 'CLEAR_NOTIFICATIONS':
-      return { ...state, notifications: [], unreadNotifications: 0 };
+    case 'CLEAR_NOTIFICATIONS': {
+      const clearedNotifications = [];
+      if (state.unreadNotifications !== 0) {
+        console.log('Bildirimler temizlendi, unreadNotifications 0 olarak ayarlandı.');
+      } else {
+        console.log('Zaten hiç okunmamış bildirim yok.');
+      }
+      return {
+        ...state,
+        notifications: clearedNotifications,
+        unreadNotifications: 0,
+      };
+    }
 
     case 'TOGGLE_SIDEBAR':
       return { ...state, sidebarOpen: !state.sidebarOpen };
@@ -1058,8 +1078,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const addIncome = (income: Omit<Income, 'id'>) => dispatch({ type: 'ADD_INCOME', payload: income });
   const setUser = (name: string) => dispatch({ type: 'SET_USER', payload: name });
   const deleteUser = (id: string) => dispatch({ type: 'DELETE_USER', payload: id });
-  const addNotification = (notification: string) => dispatch({ type: 'ADD_NOTIFICATION', payload: notification });
-  const clearNotifications = () => dispatch({ type: 'CLEAR_NOTIFICATIONS' });
+  const addNotification = (notification: string) => {
+    console.log(`Yeni bildirim eklendi: ${notification}, unreadNotifications: ${state.unreadNotifications + 1}`);
+    dispatch({ type: 'ADD_NOTIFICATION', payload: notification });
+  };
+  const clearNotifications = () => {
+    console.log('Bildirimler temizleniyor, unreadNotifications sıfırlanıyor.');
+    dispatch({ type: 'CLEAR_NOTIFICATIONS' });
+  };
   const toggleSidebar = () => dispatch({ type: 'TOGGLE_SIDEBAR' });
   const toggleMaintenance = (buildingId: string, showReceipt = false) => dispatch({ type: 'TOGGLE_MAINTENANCE', payload: { buildingId, showReceipt } });
   const reportFault = (buildingId: string, faultData: { description: string; severity: 'low' | 'medium' | 'high'; reportedBy: string }) =>
