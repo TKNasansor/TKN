@@ -135,10 +135,10 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2">
-      <div className="bg-white rounded-lg shadow-xl w-full">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md sm:w-11/12 flex flex-col items-center">
         {/* ToastContainer bileşeni */}
         <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} closeOnClick pauseOnHover />
-        <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+        <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 w-full">
           <div className="flex items-center">
             <QrCode className="h-5 w-5 text-blue-600 mr-2" />
             <div>
@@ -152,9 +152,9 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
         </div>
 
         {step === 'edit' ? (
-          <div className="p-4">
-            <div className="mb-4">
-              <div className="flex items-center space-x-3 mb-3">
+          <div className="p-4 flex flex-col items-center w-full">
+            <div className="mb-4 w-full">
+              <div className="flex items-center space-x-3 mb-3 justify-center">
                 <div className="flex items-center space-x-1">
                   <div className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-medium">1</div>
                   <span className="font-medium text-blue-600 text-sm">İçerik Düzenle</span>
@@ -168,7 +168,7 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
             </div>
 
             {validationErrors.length > 0 && (
-              <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
+              <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4 w-full max-w-xs mx-auto">
                 <h4 className="text-xs font-medium text-red-800 mb-1">Düzeltilmesi Gereken Hatalar:</h4>
                 <ul className="text-xs text-red-700 space-y-1">
                   {validationErrors.map((error, index) => (
@@ -178,7 +178,7 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
               </div>
             )}
 
-            <div className="space-y-4">
+            <div className="space-y-4 w-full max-w-xs mx-auto">
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Bina Adı *</label>
                 <input
@@ -218,7 +218,7 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
               </div>
             </div>
 
-            <div className="flex justify-end space-x-2 mt-4">
+            <div className="flex justify-center space-x-2 mt-4 w-full">
               <button
                 onClick={onClose}
                 className="px-3 py-1 border border-gray-300 rounded-md text-xs font-medium text-gray-700 hover:bg-gray-50"
@@ -247,9 +247,9 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
             </div>
           </div>
         ) : (
-          <div className="p-4">
-            <div className="mb-4">
-              <div className="flex items-center space-x-3 mb-3">
+          <div className="p-4 flex flex-col items-center w-full">
+            <div className="mb-4 w-full">
+              <div className="flex items-center space-x-3 mb-3 justify-center">
                 <div className="flex items-center space-x-1">
                   <div className="w-6 h-6 bg-green-600 text-white rounded-full flex items-center justify-center text-xs font-medium">✓</div>
                   <span className="text-green-600 font-medium text-sm">İçerik Düzenlendi</span>
@@ -262,14 +262,14 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
               </div>
             </div>
 
-            <div className="text-center">
+            <div className="text-center w-full">
               <h3 className="text-base font-semibold text-gray-900 mb-4">QR Kod Önizlemesi</h3>
               <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200 max-w-xs mx-auto">
                 {state.settings?.companyName && (
                   <div className="text-sm font-bold text-gray-900 mb-1">{state.settings.companyName}</div>
                 )}
                 <div className="text-xl font-bold text-gray-900 mb-3">{qrContent.buildingName}</div>
-                <div ref={printRef} className="mb-3 p-2 bg-white border border-gray-200 rounded-md shadow-sm">
+                <div ref={printRef} className="mb-3 p-2 bg-white border border-gray-200 rounded-md shadow-sm mx-auto">
                   <QRCodeSVG
                     value={`${window.location.origin}/report-fault/${buildingId}`}
                     size={160}
@@ -297,7 +297,7 @@ const QRCodeManager: React.FC<QRCodeManagerProps> = ({
               </div>
             </div>
 
-            <div className="flex justify-center space-x-2 mt-4">
+            <div className="flex justify-center space-x-2 mt-4 w-full">
               <button
                 onClick={() => setStep('edit')}
                 className="px-3 py-1 border border-gray-300 rounded-md text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center transition-colors duration-200"
