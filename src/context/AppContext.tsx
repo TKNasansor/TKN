@@ -1157,7 +1157,7 @@ function generateMaintenanceReceipt(building: Building, state: AppState, technic
   return htmlContent;
 }
 
-const AppContext = createContext<{
+const AppContext = React.createContext<AppContextType | undefined>(undefined);
   state: AppState;
   addBuilding: (building: Omit<Building, 'id'>) => void;
   updateBuilding: (building: Building) => void;
