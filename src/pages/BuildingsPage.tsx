@@ -10,10 +10,8 @@ import QRCodeManager from '../components/QRCodeManager';
 import { useAutoSave } from '../hooks/useAutoSave';
 
 const BuildingsPage: React.FC = () => {
-  // useApp hook'undan gerekli fonksiyonları ve state'i çekiyoruz
   const { state, addBuilding, deleteBuilding, toggleMaintenance, reportFault, addQRCodeData, revertMaintenance, getLatestArchivedReceiptHtml, showReceiptModal } = useApp();
   
-  // Component state'leri
   const [activeTab, setActiveTab] = useState<'all' | 'maintained' | 'unmaintained'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [labelFilter, setLabelFilter] = useState<'all' | 'green' | 'blue' | 'yellow' | 'red' | 'none'>('all');
@@ -21,14 +19,10 @@ const BuildingsPage: React.FC = () => {
   const [showQRManager, setShowQRManager] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [showMaintenanceOptions, setShowMaintenanceOptions] = useState<string | null>(null);
-  // Arıza bildirim modalının görünürlüğünü kontrol eder
   const [showFaultModal, setShowFaultModal] = useState<string | null>(null);
-  // Kaydedilmemiş değişiklikler modalının görünürlüğünü kontrol eder
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
-  // Modal açıldıktan sonra bekleyen eylemi tutar
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   
-  // Yeni bina ekleme formu için state
   const [newBuilding, setNewBuilding] = useState<Omit<Building, 'id'>>({
     name: '',
     maintenanceFee: 0,
@@ -45,10 +39,10 @@ const BuildingsPage: React.FC = () => {
     notes: '',
     isMaintained: false,
     isDefective: false,
-    label: null
+    label: null,
+    buildingResponsible: '' // YENİ EKLENDİ
   });
 
-  // Otomatik kaydetme fonksiyonelliği için useAutoSave hook'u
   const { hasUnsavedChanges, saveNow, lastSaved } = useAutoSave({
     formType: 'building-form',
     formData: newBuilding,
@@ -58,7 +52,6 @@ const BuildingsPage: React.FC = () => {
     }
   });
 
-  // Örnek bina verileri (uygulama boşken yüklenecek)
   const sampleBuildings = [
     {
       name: 'Merkez Plaza',
@@ -76,7 +69,8 @@ const BuildingsPage: React.FC = () => {
       notes: '',
       isMaintained: false,
       isDefective: false,
-      label: 'green' as const
+      label: 'green' as const,
+      buildingResponsible: 'Ahmet Yılmaz' // YENİ EKLENDİ
     },
     {
       name: 'Park Residence',
@@ -94,7 +88,8 @@ const BuildingsPage: React.FC = () => {
       notes: '',
       isMaintained: false,
       isDefective: false,
-      label: 'blue' as const
+      label: 'blue' as const,
+      buildingResponsible: 'Ayşe Demir' // YENİ EKLENDİ
     },
     {
       name: 'Sahil Apartmanı',
@@ -112,18 +107,17 @@ const BuildingsPage: React.FC = () => {
       notes: '',
       isMaintained: false,
       isDefective: false,
-      label: null
+      label: null,
+      buildingResponsible: 'Mehmet Can' // YENİ EKLENDİ
     }
   ];
 
-  // Uygulama yüklendiğinde örnek binaları ekler (eğer hiç bina yoksa)
   React.useEffect(() => {
     if (state.buildings.length === 0) {
       sampleBuildings.forEach(building => addBuilding(building));
     }
   }, []);
 
-  // Form inputları değiştikçe state'i günceller
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     
@@ -145,7 +139,6 @@ const BuildingsPage: React.FC = () => {
     }
   };
 
-  // Yeni bina ekleme formunu gönderir
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     addBuilding(newBuilding);
@@ -165,52 +158,45 @@ const BuildingsPage: React.FC = () => {
       notes: '',
       isMaintained: false,
       isDefective: false,
-      label: null
+      label: null,
+      buildingResponsible: '' // YENİ EKLENDİ
     });
     setShowAddForm(false);
   };
 
-  // Bina silme işlemini yönetir
   const handleDeleteBuilding = (buildingId: string) => {
     deleteBuilding(buildingId);
     setShowDeleteConfirm(null);
   };
 
-  // Bakım işlemlerini yöneten ana fonksiyon
   const handleMaintenanceAction = (buildingId: string, actionType: 'toggle' | 'revert' | 'showReceipt') => {
     if (actionType === 'toggle') {
-      // "Sadece İşaretle" seçildiğinde fiş gösterme parametresini false yap
       toggleMaintenance(buildingId, false); 
     } else if (actionType === 'revert') {
       revertMaintenance(buildingId);
     } else if (actionType === 'showReceipt') {
       const receiptHtml = getLatestArchivedReceiptHtml(buildingId);
       if (receiptHtml) {
-        // Fiş bulunduysa modalı AppContext üzerindeki fonksiyonla göster
         showReceiptModal(receiptHtml); 
       } else {
-        // Arşivlenmiş fiş yoksa ve "Bakım Fişi Oluştur ve Göster" seçildiyse, yeni bakım fişi oluştur
         const building = state.buildings.find(b => b.id === buildingId);
         if (building) {
-          toggleMaintenance(buildingId, true); // Yeni fiş oluştur ve göster
+          toggleMaintenance(buildingId, true);
         }
       }
     }
-    setShowMaintenanceOptions(null); // İşlem bitince bakım seçenekleri modalını kapat
+    setShowMaintenanceOptions(null);
   };
 
-  // Binayı arızalı olarak işaretleme modalını açar
   const handleMarkAsDefective = (buildingId: string) => {
     setShowFaultModal(buildingId);
   };
 
-  // Arıza bildirimini gönderir
   const handleFaultSubmit = (buildingId: string, faultData: { description: string; severity: 'low' | 'medium' | 'high'; reportedBy: string }) => {
     reportFault(buildingId, faultData);
     setShowFaultModal(null);
   };
 
-  // Formu kapatma işlemi (kaydedilmemiş değişiklik varsa uyarı verir)
   const handleFormClose = () => {
     if (hasUnsavedChanges) {
       setPendingAction(() => () => setShowAddForm(false));
@@ -220,7 +206,6 @@ const BuildingsPage: React.FC = () => {
     }
   };
 
-  // Kaydedilmemiş değişiklikleri kaydetme
   const handleUnsavedSave = async () => {
     await saveNow();
     setShowUnsavedModal(false);
@@ -230,7 +215,6 @@ const BuildingsPage: React.FC = () => {
     }
   };
 
-  // Kaydedilmemiş değişiklikleri atma
   const handleUnsavedDiscard = () => {
     setShowUnsavedModal(false);
     if (pendingAction) {
@@ -239,13 +223,11 @@ const BuildingsPage: React.FC = () => {
     }
   };
 
-  // Kaydedilmemiş değişiklikler modalını kapatıp forma geri dönme
   const handleUnsavedReturn = () => {
     setShowUnsavedModal(false);
     setPendingAction(null);
   };
 
-  // QR kodu kaydetme işlemi
   const handleQRSave = (qrData: any) => {
     const qrCodeData = {
       id: `qr_${Date.now()}`,
@@ -261,14 +243,12 @@ const BuildingsPage: React.FC = () => {
     console.log('QR Kodu kaydedildi:', qrCodeData);
   };
 
-  // Binanın tam adresini döndürür
   const getFullAddress = (building: Building) => {
     if (!building.address) return '';
     const { mahalle, sokak, binaNo, ilce, il } = building.address;
     return `${mahalle} ${sokak} ${binaNo}, ${ilce}/${il}`.trim();
   };
 
-  // Etiket rengini döndürür
   const getLabelColor = (label: string | null) => {
     switch (label) {
       case 'green': return 'bg-green-500';
@@ -279,7 +259,6 @@ const BuildingsPage: React.FC = () => {
     }
   };
 
-  // Etiket metnini döndürür
   const getLabelText = (label: string | null) => {
     switch (label) {
       case 'green': return 'Yeşil';
@@ -290,7 +269,6 @@ const BuildingsPage: React.FC = () => {
     }
   };
 
-  // Filtrelenmiş bina listesini oluşturur
   const filteredBuildings = state.buildings.filter(building => {
     if (activeTab === 'all') return true;
     if (activeTab === 'maintained' && !building.isMaintained) return false;
@@ -308,7 +286,8 @@ const BuildingsPage: React.FC = () => {
     return (
       building.name.toLowerCase().includes(query) ||
       fullAddress.toLowerCase().includes(query) ||
-      building.contactInfo.toLowerCase().includes(query)
+      building.contactInfo.toLowerCase().includes(query) ||
+      building.buildingResponsible?.toLowerCase().includes(query) // YENİ EKLENDİ
     );
   });
 
@@ -422,6 +401,21 @@ const BuildingsPage: React.FC = () => {
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                     value={newBuilding.name}
                     onChange={handleInputChange}
+                  />
+                </div>
+
+                <div> {/* Bina Sorumlusu alanı eklendi */}
+                  <label htmlFor="buildingResponsible" className="block text-sm font-medium text-gray-700">
+                    Bina Sorumlusu
+                  </label>
+                  <input
+                    type="text"
+                    id="buildingResponsible"
+                    name="buildingResponsible"
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    value={newBuilding.buildingResponsible}
+                    onChange={handleInputChange}
+                    placeholder="Bina sorumlusunun adı"
                   />
                 </div>
 
@@ -769,6 +763,7 @@ const BuildingsPage: React.FC = () => {
                           <span className="mx-1">•</span>
                           <span className="truncate">Borç: {building.debt.toLocaleString('tr-TR')} ₺</span>
                         </p>
+                        <p className="mt-1 text-xs md:text-sm text-gray-500 truncate">Sorumlu: {building.buildingResponsible || 'Belirtilmemiş'}</p> {/* YENİ EKLENDİ */}
                         <p className="mt-1 text-xs md:text-sm text-gray-500 truncate">{building.contactInfo}</p>
                         <p className="mt-1 text-xs md:text-sm text-gray-500 truncate">{getFullAddress(building)}</p>
                         {building.lastMaintenanceDate && building.lastMaintenanceTime && (
