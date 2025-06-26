@@ -24,6 +24,7 @@ export interface Building {
   faultTimestamp?: string; // Arıza zamanı
   faultReportedBy?: string; // Arızayı bildiren
   label?: 'green' | 'blue' | 'yellow' | 'red' | null;
+  buildingResponsible?: string; // YENİ EKLENDİ
 }
 
 export interface Part {
@@ -105,6 +106,7 @@ export interface AppSettings {
     latitude?: number;
     longitude?: number;
   };
+  companySlogan?: string; // YENİ EKLENDİ
   ceEmblemUrl?: string;
   tseEmblemUrl?: string;
   receiptTemplate: string;
@@ -210,6 +212,7 @@ export interface Proposal {
   type: 'installation' | 'maintenance' | 'revision';
   templateId: string;
   buildingName: string;
+  buildingId?: string; // YENİ EKLENDİ
   title: string;
   description: string;
   fieldValues: Record<string, any>;
