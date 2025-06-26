@@ -48,278 +48,299 @@ const initialState: AppState = {
     ceEmblemUrl: '/ce.png',
     tseEmblemUrl: '/ts.jpg',
     receiptTemplate: `
-      <div class="receipt-container">
-        <div class="header-section">
-          <div class="header-left">
-            <img src="/tknlift-logo.png" alt="TKNLİFT Logo" class="logo">
-          </div>
-          <div class="header-center">
-            <h1 class="company-name-title">{{COMPANY_NAME}}</h1>
-          </div>
-          <div class="header-right">
-            {{TSE_EMBLEM}}{{CE_EMBLEM}}
-          </div>
-        </div>
-        <div class="receipt-title-section">
-          <h2>BAKIM - ARIZA SERVİS FORMU</h2>
-        </div>
-        <div class="contact-and-date-section">
-          <div class="contact-info">
-            <p><strong>Servis No:</strong> {{COMPANY_PHONE}}</p>
-            <p>{{COMPANY_ADDRESS}}</p>
-          </div>
-          <div class="date-info">
-            <p><strong>Tarih:</strong> {{DATE}}</p>
-          </div>
-        </div>
-        <div class="building-details-section">
-          <h3>Bina Adı: {{BUILDING_NAME}}</h3>
-        </div>
-        {{MAINTENANCE_NOTE_SECTION}}
-        <div class="maintenance-summary-section">
-          <h3>Yapılan İşlemler</h3>
-          <div class="summary-item">
-            <span>Bakım Yapıldı</span>
-            <span>{{MAINTENANCE_FEE_CALCULATED}}</span>
-          </div>
-        </div>
-        {{PARTS_SECTION}}
-        <div class="total-amount-section">
-          <div class="total-row">
-            <span>Toplam Tutar:</span>
-            <span class="final-total">{{FINAL_TOTAL_AMOUNT}}</span>
-          </div>
-          {{BUILDING_CURRENT_DEBT_SECTION}}
-        </div>
-        <div class="note-section">
-          <p><strong>Not:</strong> Bu bakımdan sonra meydana gelebilecek kapı camı kırılması, tavan aydınlatmasının kırılması durumlarında durumu hemen firmamıza bildiriniz. Kırık kapı camı ile asansörü çalıştırmayınız. Aksi takdirde olabilecek durumlardan firmamız sorumlu olmayacaktır.</p>
-        </div>
-        <div class="footer-warning-section">
-          <p><strong>Uyarı:</strong> Asansör bakımı esnasında değiştirilmesi önerilen parçaların apartman yönetimi tarafından parça değişimine onay verilmemesi durumunda doğacak aksaklık ve kazalardan firmamız sorumlu değildir.</p>
-        </div>
-        <div class="signature-section">
-          <p>Asansör Firma Yetkilisi</p>
-          <p>{{TECHNICIAN_NAME}}</p>
-        </div>
-        <div class="watermark"></div>
+<div class="receipt-container">
+  <div class="header-section">
+    <div class="header-left">{{LOGO}}</div>
+    <div class="header-center">
+      <h1 class="company-name-title" style="font-family: Bodoni, serif;">{{COMPANY_NAME}}</h1>
+    </div>
+    <div class="header-right">
+      <!-- Dinamik sertifikalar için döngü -->
+      <div class="certificates">
+        {{#each CERTIFICATES}}
+          <img src="{{this}}" alt="Sertifika" class="certificate-img">
+        {{/each}}
       </div>
-      <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        .receipt-container {
-          max-width: 800px;
-          margin: 0 auto;
-          padding: 20px;
-          font-family: 'Inter', sans-serif;
-          color: #1A1A1A;
-          background: #FFFFFF;
-          border: 1px solid #E5E7EB;
-          border-radius: 8px;
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-          position: relative;
-          overflow: hidden;
-        }
-        .watermark {
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-          width: 80%;
-          height: 80%;
-          background: url('/tknlift-logo.png') no-repeat center;
-          background-size: contain;
-          opacity: 0.1;
-          pointer-events: none;
-        }
-        .header-section {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding-bottom: 16px;
-          border-bottom: 1px solid #E5E7EB;
-          margin-bottom: 20px;
-        }
-        .header-left .logo {
-          max-height: 60px;
-          object-fit: contain;
-        }
-        .header-center {
-          text-align: center;
-          flex-grow: 1;
-        }
-        .company-name-title {
-          font-size: 24px;
-          font-weight: 700;
-          color: #005B99;
-          margin: 0;
-        }
-        .header-right {
-          display: flex;
-          gap: 10px;
-        }
-        .header-right img {
-          max-height: 40px;
-          object-fit: contain;
-        }
-        .receipt-title-section {
-          text-align: center;
-          background: #005B99;
-          color: #FFFFFF;
-          padding: 12px 0;
-          border-radius: 4px;
-          margin-bottom: 20px;
-        }
-        .receipt-title-section h2 {
-          font-size: 18px;
-          font-weight: normal;
-          margin: 0;
-          text-transform: uppercase;
-        }
-        .contact-and-date-section {
-          display: flex;
-          justify-content: space-between;
-          margin-bottom: 16px;
-          font-size: 13px;
-          color: #4B5563;
-        }
-        .contact-info p, .date-info p {
-          margin: 4px 0;
-        }
-        .contact-info p strong, .date-info p strong {
-          color: #1A1A1A;
-        }
-        .building-details-section {
-          background: #F9FAFB;
-          padding: 12px 16px;
-          border-radius: 4px;
-          margin-bottom: 20px;
-        }
-        .building-details-section h3 {
-          font-size: 16px;
-          font-weight: 600;
-          color: #1A1A1A;
-          margin: 0;
-        }
-        .maintenance-summary-section {
-          margin-bottom: 20px;
-          padding: 16px;
-          border: 1px solid #E5E7EB;
-          border-radius: 4px;
-        }
-        .maintenance-summary-section h3 {
-          font-size: 16px;
-          font-weight: 600;
-          color: #005B99;
-          margin: 0 0 8px;
-        }
-        .summary-item {
-          display: flex;
-          justify-content: space-between;
-          padding: 8px 0;
-          border-bottom: 1px solid #F3F4F6;
-        }
-        .summary-item:last-child {
-          border-bottom: none;
-        }
-        .summary-item span:first-child {
-          font-weight: 500;
-          color: #1A1A1A;
-        }
-        .parts-section {
-          margin-bottom: 20px;
-          padding: 16px;
-          border: 1px solid #E5E7EB;
-          border-radius: 4px;
-        }
-        .parts-section .section-title {
-          font-size: 16px;
-          font-weight: 600;
-          color: #005B99;
-          margin-bottom: 8px;
-        }
-        .parts-list {
-          list-style: none;
-          padding: 0;
-          margin: 0;
-        }
-        .parts-list li {
-          padding: 8px 0;
-          border-bottom: 1px solid #F3F4F6;
-          font-size: 13px;
-          color: #1A1A1A;
-        }
-        .parts-list li:last-child {
-          border-bottom: none;
-        }
-        .total-amount-section {
-          background: #F9FAFB;
-          padding: 16px 20px;
-          border-top: 2px solid #005B99;
-          margin-top: 20px;
-          border-radius: 4px;
-        }
-        .total-row {
-          display: flex;
-          justify-content: space-between;
-          font-size: 16px;
-          font-weight: 600;
-          color: #1A1A1A;
-        }
-        .final-total {
-          color: #005B99;
-          font-size: 18px;
-        }
-        .building-current-debt {
-          font-size: 13px;
-          color: #4B5563;
-          margin-top: 8px;
-          text-align: right;
-        }
-        .note-section {
-          background: #FEFCE8;
-          border: 1px solid #FEF08A;
-          padding: 12px 16px;
-          margin: 20px 0;
-          border-radius: 4px;
-          font-size: 12px;
-          color: #713F12;
-        }
-        .footer-warning-section {
-          text-align: center;
-          margin-top: 20px;
-          padding-top: 16px;
-          border-top: 1px solid #E5E7EB;
-          font-size: 12px;
-          color: #4B5563;
-        }
-        .footer-warning-section p strong {
-          color: #005B99;
-        }
-        .signature-section {
-          text-align: right;
-          margin-top: 20px;
-          font-size: 13px;
-          color: #1A1A1A;
-        }
-        .signature-section p {
-          margin: 4px 0;
-          font-weight: 500;
-        }
-        @media print {
-          .receipt-container {
-            box-shadow: none;
-            border: none;
-            padding: 0;
-          }
-          .header-section, .receipt-title-section, .contact-and-date-section,
-          .building-details-section, .maintenance-summary-section, .parts-section,
-          .total-amount-section, .note-section, .footer-warning-section, .signature-section {
-            page-break-inside: avoid;
-          }
-          .watermark {
-            opacity: 0.05;
-          }
-        }
-      </style>
+    </div>
+  </div>
+  <div class="receipt-title-section">
+    <h2>BAKIM - ARIZA SERVİS FORMU</h2>
+  </div>
+  <div class="contact-and-date-section">
+    <div class="contact-info">
+      <p>Servis No : {{COMPANY_PHONE}}</p>
+      <p>{{COMPANY_ADDRESS}}</p>
+    </div>
+    <div class="date-info">
+      <p style="font-weight:bold;font-size:16px;color:#333;">Tarih : {{DATE}}</p>
+    </div>
+  </div>
+  <div class="building-details-section">
+    <h3>Bina Adı : {{BUILDING_NAME}}</h3>
+    <p>Bina Adresi : {{BUILDING_ADDRESS}}</p>
+    <p>Asansör Sayısı : {{ELEVATOR_COUNT}}</p>
+  </div>
+  <div class="note-section">
+    <p>
+      Not: Bu bakımdan sonra meydana gelebilecek kapı camı kırılması, tavan aydınlatmasının kırılması durumlarında durumu hemen firmamıza bildiriniz. 
+      Kırık kapı camı ile asansörü çalıştırmayınız. Aksi takdirde olabilecek durumlardan firmamız sorumlu olmayacaktır.
+    </p>
+  </div>
+  <div class="maintenance-summary-section">
+    <h3>YAPILAN İŞLEMLER</h3>
+    <div class="summary-item">
+      <span>Bakım Yapıldı</span>
+      <span>{{MAINTENANCE_ACTION}}</span>
+    </div>
+    <!-- Dinamik bakım ücreti (asansör sayısı * bakım ücreti) -->
+    <div class="summary-item">
+      <span>Bakım Ücreti</span>
+      <span>{{MAINTENANCE_FEE}}</span>
+    </div>
+    <!-- Borç varsa göster -->
+    {{#if DEBT_SECTION}}
+      <div class="summary-item">
+        <span>Bina Borcu</span>
+        <span>{{DEBT_SECTION}}</span>
+      </div>
+    {{/if}}
+    <!-- Parçalar bölümü varsa göster -->
+    {{#if PARTS_SECTION}}
+      <div class="parts-section">
+        <div class="section-title">Takılan Parçalar</div>
+        <ul class="parts-list">
+          {{{PARTS_SECTION}}}
+        </ul>
+      </div>
+    {{/if}}
+    <!-- Toplam tutar -->
+    <div class="total-amount-section">
+      <span>Toplam Tutar:</span>
+      <span class="final-total">{{TOTAL_AMOUNT}}</span>
+    </div>
+  </div>
+  <div class="footer-warning-section">
+    <p>Uyarı: Asansör bakımı esnasında değiştirilmesi önerilen parçaların apartman yönetimi tarafından parça değişimine onay verilmemesi durumunda doğacak aksaklık ve kazalardan firmamız sorumlu değildir.</p>
+  </div>
+  <div class="signature-section">
+    <p style="font-family: Zapfino, cursive;">Asansör Firma Yetkilisi</p>
+    <p style="font-family: Zapfino, cursive;">{{TECHNICIAN}}</p>
+  </div>
+  <div class="watermark" style="background-image:url('{{LOGO}}');"></div>
+</div>
+
+<style>
+  .receipt-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 30px;
+    border: 1px solid #eee;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #333;
+    line-height: 1.6;
+    background: #fff;
+    overflow: hidden;
+    position: relative;
+  }
+  .watermark {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80%;
+    height: 80%;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+    opacity: 0.25;
+    z-index: 0;
+    pointer-events: none;
+  }
+  .header-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    border-bottom: 2px solid #ccc;
+    padding-bottom: 15px;
+    z-index: 1;
+  }
+  .header-left .logo {
+    max-height: 80px;
+    max-width: 180px;
+    object-fit: contain;
+  }
+  .header-center {
+    text-align: center;
+    flex-grow: 1;
+  }
+  .company-name-title {
+    font-size: 28px;
+    color: #dc2626;
+    margin: 0 0 5px 0;
+    font-weight: bold;
+  }
+  .header-right {
+    display: flex;
+    gap: 15px;
+  }
+  .certificates {
+    display: flex;
+    gap: 15px;
+  }
+  .certificate-img {
+    max-height: 50px;
+    object-fit: contain;
+  }
+  .receipt-title-section {
+    text-align: center;
+    background: #dc2626;
+    color: white;
+    padding: 10px 0;
+    margin-bottom: 25px;
+    z-index: 1;
+  }
+  .receipt-title-section h2 {
+    margin: 0;
+    font-size: 22px;
+    text-transform: uppercase;
+  }
+  .contact-and-date-section {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    font-size: 14px;
+    color: #555;
+    z-index: 1;
+  }
+  .contact-info p, .date-info p {
+    margin: 5px 0;
+  }
+  .building-details-section {
+    background: #f8f8f8;
+    padding: 15px 20px;
+    margin-bottom: 20px;
+    border-left: 5px solid #dc2626;
+    z-index: 1;
+  }
+  .building-details-section h3 {
+    margin: 0 0 8px 0;
+    color: #333;
+    font-size: 19px;
+  }
+  .note-section {
+    background: #fffbe6;
+    border: 1px solid #ffe58f;
+    padding: 15px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    color: #7a5f00;
+    border-radius: 5px;
+    z-index: 1;
+  }
+  .maintenance-summary-section {
+    margin-bottom: 20px;
+    border: 1px solid #eee;
+    padding: 15px;
+    border-radius: 5px;
+    z-index: 1;
+  }
+  .maintenance-summary-section h3 {
+    font-size: 18px;
+    font-weight: bold;
+    color: #dc2626;
+    margin-bottom: 10px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .summary-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+    border-bottom: 1px dotted #e0e0e0;
+  }
+  .summary-item:last-child {
+    border-bottom: none;
+  }
+  .summary-item span:first-child {
+    font-weight: bold;
+    color: #444;
+  }
+  .parts-section .section-title {
+    font-size: 18px;
+    font-weight: bold;
+    color: #dc2626;
+    margin-bottom: 10px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .parts-list {
+    margin: 0;
+    padding: 0 0 0 20px;
+  }
+  .parts-list li {
+    margin: 5px 0;
+  }
+  .total-amount-section {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-end;
+    background: #f3f4f6;
+    padding: 15px 20px;
+    border-top: 2px solid #dc2626;
+    margin-top: 30px;
+    font-size: 20px;
+    font-weight: bold;
+    color: #333;
+    z-index: 1;
+  }
+  .total-amount-section span:first-child {
+    width: 100%;
+    text-align: right;
+    margin-bottom: 5px;
+  }
+  .final-total {
+    color: #dc2626;
+    font-size: 24px;
+  }
+  .footer-warning-section {
+    text-align: center;
+    margin-top: 30px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+    font-size: 13px;
+    color: #777;
+    z-index: 1;
+  }
+  .footer-warning-section p {
+    margin: 0;
+    font-weight: bold;
+    color: #dc2626;
+  }
+  .signature-section {
+    text-align: right;
+    margin-top: 30px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+    z-index: 1;
+  }
+  @media print {
+    .receipt-container {
+      box-shadow: none;
+      border: none;
+      padding: 0;
+    }
+    .header-section, .receipt-title-section, .contact-and-date-section, .building-details-section, .note-section, .maintenance-summary-section, .parts-section, .total-amount-section, .footer-warning-section, .signature-section {
+      box-shadow: none;
+      page-break-inside: avoid;
+    }
+    .watermark {
+      opacity: 0.15;
+    }
+  }
+</style>
     `,
     installationProposalTemplate: '',
     maintenanceProposalTemplate: '',
