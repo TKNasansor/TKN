@@ -51,7 +51,7 @@ const Header: React.FC = () => {
               <Menu className="h-6 w-6" />
             </button>
             <h1 className="ml-3 text-lg font-semibold text-gray-800 truncate max-w-xs sm:max-w-none">
-              {state.settings?.appTitle}
+              TKNLİFT {/* BURASI GÜNCELLENDİ */}
             </h1>
           </div>
           
