@@ -47,7 +47,7 @@ const initialState: AppState = {
     companyAddress: { mahalle: '', sokak: '', il: '', ilce: '', binaNo: '' },
     ceEmblemUrl: '/ce.png',
     tseEmblemUrl: '/ts.jpg',
-    receiptTemplate: '', // Artık bu kullanılmayacak, yerine yeni şablon geçecek
+    receiptTemplate: '', // Artık bu kullanılmayacak
     installationProposalTemplate: '',
     maintenanceProposalTemplate: '',
     revisionProposalTemplate: '',
@@ -238,7 +238,7 @@ function appReducer(state: AppState, action: Action): AppState {
       const updatedParts = state.parts.map(p =>
         p.id === action.payload.partId ? { ...p, quantity: p.quantity - action.payload.quantity } : p
       );
-      const updatedBuildings = state.buildings.map(b =>
+      const updatedBuildingsInstall = state.buildings.map(b =>
         b.id === action.payload.buildingId ? { ...b, debt: (b.debt || 0) + totalPartCost } : b
       );
       const debtRecord: DebtRecord = {
@@ -258,7 +258,7 @@ function appReducer(state: AppState, action: Action): AppState {
         ...state,
         partInstallations: [...state.partInstallations, installation],
         parts: updatedParts,
-        buildings: updatedBuildings,
+        buildings: updatedBuildingsInstall,
         debtRecords: [...state.debtRecords, debtRecord],
         updates: [
           {
@@ -361,176 +361,105 @@ function appReducer(state: AppState, action: Action): AppState {
     case 'TOGGLE_SIDEBAR':
       return { ...state, sidebarOpen: !state.sidebarOpen };
 
-case 'TOGGLE_MAINTENANCE':
-  const { buildingId, showReceipt } = action.payload;
-  const targetBuilding = state.buildings.find(b => b.id === buildingId);
+    case 'TOGGLE_MAINTENANCE':
+      const { buildingId, showReceipt } = action.payload;
+      const targetBuilding = state.buildings.find(b => b.id === buildingId);
 
-  if (!targetBuilding || targetBuilding.isMaintained) {
-    if (showReceipt && targetBuilding) {
-      const receiptHtml = generateMaintenanceReceipt(targetBuilding, state, state.currentUser?.name || 'Bilinmeyen');
-      return { ...state, showReceiptModal: true, receiptModalHtml: receiptHtml };
-    }
-    return state;
-  }
-
-  const currentDate = new Date().toISOString().split('T')[0];
-  const currentTime = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-  const updatedBuildingsToggle = state.buildings.map(b =>
-    b.id === buildingId
-      ? {
-          ...b,
-          isMaintained: true,
-          lastMaintenanceDate: currentDate,
-          lastMaintenanceTime: currentTime,
-          isDefective: false,
-          defectiveNote: undefined,
-          faultSeverity: undefined,
-          faultTimestamp: undefined,
-          faultReportedBy: undefined,
+      if (!targetBuilding || targetBuilding.isMaintained) {
+        if (showReceipt && targetBuilding) {
+          const receiptHtml = generateMaintenanceReceipt(targetBuilding, state, state.currentUser?.name || 'Bilinmeyen');
+          return { ...state, showReceiptModal: true, receiptModalHtml: receiptHtml };
         }
-      : b
-  );
+        return state;
+      }
 
-  const newMaintenanceRecordId = uuidv4();
-  const maintenanceRecord: MaintenanceRecord = {
-    id: newMaintenanceRecordId,
-    buildingId,
-    performedBy: state.currentUser?.name || 'Bilinmeyen',
-    maintenanceDate: currentDate,
-    maintenanceTime: currentTime,
-    elevatorCount: targetBuilding.elevatorCount,
-    totalFee: targetBuilding.maintenanceFee * targetBuilding.elevatorCount,
-    status: 'completed',
-    priority: 'medium',
-    searchableText: `${targetBuilding.name} ${state.currentUser?.name || 'Bilinmeyen'} bakım`,
-  };
-  const currentMonth = currentDate.substring(0, 7);
-  const maintenanceFeeAlreadyAdded = state.debtRecords.some(
-    dr => dr.buildingId === buildingId && dr.type === 'maintenance' && dr.date.substring(0, 7) === currentMonth && dr.relatedRecordId === newMaintenanceRecordId
-  );
+      const currentDate = new Date().toISOString().split('T')[0];
+      const currentTime = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+      const updatedBuildingsToggle = state.buildings.map(b =>
+        b.id === buildingId
+          ? {
+              ...b,
+              isMaintained: true,
+              lastMaintenanceDate: currentDate,
+              lastMaintenanceTime: currentTime,
+              isDefective: false,
+              defectiveNote: undefined,
+              faultSeverity: undefined,
+              faultTimestamp: undefined,
+              faultReportedBy: undefined,
+            }
+          : b
+      );
 
-  let updatedBuildingsWithDebt = [...updatedBuildingsToggle];
-  let newDebtRecords = [...state.debtRecords];
-  if (!maintenanceFeeAlreadyAdded) {
-    const maintenanceFee = targetBuilding.maintenanceFee * targetBuilding.elevatorCount;
-    updatedBuildingsWithDebt = updatedBuildingsToggle.map(b =>
-      b.id === buildingId ? { ...b, debt: (b.debt || 0) + maintenanceFee } : b
-    );
-    newDebtRecords = [
-      ...newDebtRecords,
-      {
+      const newMaintenanceRecordId = uuidv4();
+      const maintenanceRecord: MaintenanceRecord = {
+        id: newMaintenanceRecordId,
+        buildingId,
+        performedBy: state.currentUser?.name || 'Bilinmeyen',
+        maintenanceDate: currentDate,
+        maintenanceTime: currentTime,
+        elevatorCount: targetBuilding.elevatorCount,
+        totalFee: targetBuilding.maintenanceFee * targetBuilding.elevatorCount,
+        status: 'completed',
+        priority: 'medium',
+        searchableText: `${targetBuilding.name} ${state.currentUser?.name || 'Bilinmeyen'} bakım`,
+      };
+      const currentMonth = currentDate.substring(0, 7);
+      const maintenanceFeeAlreadyAdded = state.debtRecords.some(
+        dr => dr.buildingId === buildingId && dr.type === 'maintenance' && dr.date.substring(0, 7) === currentMonth && dr.relatedRecordId === newMaintenanceRecordId
+      );
+
+      let updatedBuildingsWithDebt = [...updatedBuildingsToggle];
+      let newDebtRecords = [...state.debtRecords];
+      if (!maintenanceFeeAlreadyAdded) {
+        const maintenanceFee = targetBuilding.maintenanceFee * targetBuilding.elevatorCount;
+        updatedBuildingsWithDebt = updatedBuildingsToggle.map(b =>
+          b.id === buildingId ? { ...b, debt: (b.debt || 0) + maintenanceFee } : b
+        );
+        newDebtRecords = [
+          ...newDebtRecords,
+          {
+            id: uuidv4(),
+            buildingId,
+            date: currentDate,
+            type: 'maintenance',
+            description: `Bakım ücreti (${targetBuilding.elevatorCount} asansör)`,
+            amount: maintenanceFee,
+            previousDebt: targetBuilding.debt || 0,
+            newDebt: (targetBuilding.debt || 0) + maintenanceFee,
+            performedBy: state.currentUser?.name || 'Bilinmeyen',
+            relatedRecordId: newMaintenanceRecordId,
+          },
+        ];
+      }
+
+      const maintenanceHistory: MaintenanceHistory = {
         id: uuidv4(),
         buildingId,
-        date: currentDate,
-        type: 'maintenance',
-        description: `Bakım ücreti (${targetBuilding.elevatorCount} asansör)`,
-        amount: maintenanceFee,
-        previousDebt: targetBuilding.debt || 0,
-        newDebt: (targetBuilding.debt || 0) + maintenanceFee,
+        maintenanceDate: currentDate,
+        maintenanceTime: currentTime,
         performedBy: state.currentUser?.name || 'Bilinmeyen',
+        maintenanceFee: targetBuilding.maintenanceFee * targetBuilding.elevatorCount,
         relatedRecordId: newMaintenanceRecordId,
-      },
-    ];
-  }
+      };
 
-  const maintenanceHistory: MaintenanceHistory = {
-    id: uuidv4(),
-    buildingId,
-    maintenanceDate: currentDate,
-    maintenanceTime: currentTime,
-    performedBy: state.currentUser?.name || 'Bilinmeyen',
-    maintenanceFee: targetBuilding.maintenanceFee * targetBuilding.elevatorCount,
-    relatedRecordId: newMaintenanceRecordId,
-  };
-
-  const finalState = {
-    ...state,
-    buildings: updatedBuildingsWithDebt,
-    debtRecords: newDebtRecords,
-    maintenanceHistory: [...state.maintenanceHistory, maintenanceHistory],
-    maintenanceRecords: [...state.maintenanceRecords, maintenanceRecord],
-    updates: [
-      {
-        id: uuidv4(),
-        action: 'Bakım Tamamlandı',
-        user: state.currentUser?.name || 'Bilinmeyen',
-        timestamp: new Date().toISOString(),
-        details: `${targetBuilding.name} binasının bakımı tamamlandı.`,
-      },
-      ...state.updates,
-    ],
-  };
-
-  if (showReceipt) {
-    const receiptHtml = generateMaintenanceReceipt(targetBuilding, finalState, state.currentUser?.name || 'Bilinmeyen');
-    const archivedReceipt: ArchivedReceipt = {
-      id: uuidv4(),
-      buildingId,
-      timestamp: new Date().toISOString(),
-      htmlContent: receiptHtml,
-      relatedRecordId: newMaintenanceRecordId,
-    };
-    return {
-      ...finalState,
-      showReceiptModal: true,
-      receiptModalHtml: receiptHtml,
-      archivedReceipts: [...finalState.archivedReceipts, archivedReceipt],
-    };
-  }
-  return finalState;
-
-// ... (diğer case'ler)
-
-case 'CANCEL_MAINTENANCE':
-  const buildingCancel = state.buildings.find(b => b.id === action.payload);
-  if (!buildingCancel) return state;
-
-  const currentMonthCancel = new Date().toISOString().substring(0, 7);
-  let updatedBuildingsCancel = state.buildings.map(b =>
-    b.id === action.payload ? { ...b, isMaintained: false, lastMaintenanceDate: undefined, lastMaintenanceTime: undefined } : b
-  );
-  let updatedDebtRecords = [...state.debtRecords];
-  let updatedMaintenanceHistory = [...state.maintenanceHistory];
-  let updatedMaintenanceRecords = [...state.maintenanceRecords];
-
-  const lastDebtIndex = updatedDebtRecords.findIndex(
-    dr => dr.buildingId === action.payload && dr.type === 'maintenance' && dr.date.substring(0, 7) === currentMonthCancel
-  );
-  if (lastDebtIndex !== -1) {
-    const debtAmount = updatedDebtRecords[lastDebtIndex].amount;
-    updatedDebtRecords.splice(lastDebtIndex, 1);
-    updatedBuildingsCancel = updatedBuildingsCancel.map(b =>
-      b.id === action.payload ? { ...b, debt: Math.max(0, (b.debt || 0) - debtAmount) } : b
-    );
-  }
-
-  const lastHistoryIndex = updatedMaintenanceHistory.findIndex(
-    mh => mh.buildingId === action.payload && mh.maintenanceDate.substring(0, 7) === currentMonthCancel
-  );
-  if (lastHistoryIndex !== -1) updatedMaintenanceHistory.splice(lastHistoryIndex, 1);
-
-  const lastRecordIndex = updatedMaintenanceRecords.findIndex(
-    mr => mr.buildingId === action.payload && mr.maintenanceDate.substring(0, 7) === currentMonthCancel
-  );
-  if (lastRecordIndex !== -1) updatedMaintenanceRecords.splice(lastRecordIndex, 1);
-
-  return {
-    ...state,
-    buildings: updatedBuildingsCancel,
-    debtRecords: updatedDebtRecords,
-    maintenanceHistory: updatedMaintenanceHistory,
-    maintenanceRecords: updatedMaintenanceRecords,
-    updates: [
-      {
-        id: uuidv4(),
-        action: 'Bakım İptal Edildi',
-        user: state.currentUser?.name || 'Bilinmeyen',
-        timestamp: new Date().toISOString(),
-        details: `${buildingCancel.name} binasının son bakımı iptal edildi.`,
-      },
-      ...state.updates,
-    ],
-  };
+      const finalState = {
+        ...state,
+        buildings: updatedBuildingsWithDebt,
+        debtRecords: newDebtRecords,
+        maintenanceHistory: [...state.maintenanceHistory, maintenanceHistory],
+        maintenanceRecords: [...state.maintenanceRecords, maintenanceRecord],
+        updates: [
+          {
+            id: uuidv4(),
+            action: 'Bakım Tamamlandı',
+            user: state.currentUser?.name || 'Bilinmeyen',
+            timestamp: new Date().toISOString(),
+            details: `${targetBuilding.name} binasının bakımı tamamlandı.`,
+          },
+          ...state.updates,
+        ],
+      };
 
       if (showReceipt) {
         const receiptHtml = generateMaintenanceReceipt(targetBuilding, finalState, state.currentUser?.name || 'Bilinmeyen');
@@ -556,7 +485,7 @@ case 'CANCEL_MAINTENANCE':
 
       if (!faultBuilding) return state;
 
-      const updatedBuildings = state.buildings.map(b =>
+      const updatedBuildingsFault = state.buildings.map(b =>
         b.id === faultBuildingId
           ? {
               ...b,
@@ -571,7 +500,7 @@ case 'CANCEL_MAINTENANCE':
 
       return {
         ...state,
-        buildings: updatedBuildings,
+        buildings: updatedBuildingsFault,
         updates: [
           {
             id: uuidv4(),
@@ -697,7 +626,7 @@ case 'CANCEL_MAINTENANCE':
 
     case 'ADD_PAYMENT':
       const payment: Payment = { ...action.payload, id: uuidv4() };
-      const updatedBuildings = state.buildings.map(b =>
+      const updatedBuildingsPayment = state.buildings.map(b =>
         b.id === action.payload.buildingId ? { ...b, debt: Math.max(0, (b.debt || 0) - action.payload.amount) } : b
       );
       const building = state.buildings.find(b => b.id === action.payload.buildingId);
@@ -716,7 +645,7 @@ case 'CANCEL_MAINTENANCE':
       return {
         ...state,
         payments: [...state.payments, payment],
-        buildings: updatedBuildings,
+        buildings: updatedBuildingsPayment,
         debtRecords: [...state.debtRecords, paymentDebtRecord],
         incomes: [
           ...state.incomes,
@@ -773,9 +702,10 @@ case 'CANCEL_MAINTENANCE':
 
     case 'REMOVE_MAINTENANCE_STATUS_MARK':
       const building = state.buildings.find(b => b.id === action.payload);
+      const updatedBuildingsMark = state.buildings.map(b => (b.id === action.payload ? { ...b, isMaintained: false } : b));
       return {
         ...state,
-        buildings: state.buildings.map(b => (b.id === action.payload ? { ...b, isMaintained: false } : b)),
+        buildings: updatedBuildingsMark,
         updates: [
           {
             id: uuidv4(),
@@ -792,7 +722,7 @@ case 'CANCEL_MAINTENANCE':
       const buildingCancel = state.buildings.find(b => b.id === action.payload);
       if (!buildingCancel) return state;
 
-      const currentMonth = new Date().toISOString().substring(0, 7);
+      const currentMonthCancel = new Date().toISOString().substring(0, 7);
       let updatedBuildingsCancel = state.buildings.map(b =>
         b.id === action.payload ? { ...b, isMaintained: false, lastMaintenanceDate: undefined, lastMaintenanceTime: undefined } : b
       );
@@ -801,7 +731,7 @@ case 'CANCEL_MAINTENANCE':
       let updatedMaintenanceRecords = [...state.maintenanceRecords];
 
       const lastDebtIndex = updatedDebtRecords.findIndex(
-        dr => dr.buildingId === action.payload && dr.type === 'maintenance' && dr.date.substring(0, 7) === currentMonth
+        dr => dr.buildingId === action.payload && dr.type === 'maintenance' && dr.date.substring(0, 7) === currentMonthCancel
       );
       if (lastDebtIndex !== -1) {
         const debtAmount = updatedDebtRecords[lastDebtIndex].amount;
@@ -812,12 +742,12 @@ case 'CANCEL_MAINTENANCE':
       }
 
       const lastHistoryIndex = updatedMaintenanceHistory.findIndex(
-        mh => mh.buildingId === action.payload && mh.maintenanceDate.substring(0, 7) === currentMonth
+        mh => mh.buildingId === action.payload && mh.maintenanceDate.substring(0, 7) === currentMonthCancel
       );
       if (lastHistoryIndex !== -1) updatedMaintenanceHistory.splice(lastHistoryIndex, 1);
 
       const lastRecordIndex = updatedMaintenanceRecords.findIndex(
-        mr => mr.buildingId === action.payload && mr.maintenanceDate.substring(0, 7) === currentMonth
+        mr => mr.buildingId === action.payload && mr.maintenanceDate.substring(0, 7) === currentMonthCancel
       );
       if (lastRecordIndex !== -1) updatedMaintenanceRecords.splice(lastRecordIndex, 1);
 
@@ -855,7 +785,7 @@ case 'CANCEL_MAINTENANCE':
       const newMaintenanceHistory = state.maintenanceHistory.filter(mh => mh.relatedRecordId !== latestMaintenanceRecord.id);
       const newDebtRecords = state.debtRecords.filter(dr => dr.relatedRecordId !== latestMaintenanceRecord.id);
       const newArchivedReceipts = state.archivedReceipts.filter(ar => ar.relatedRecordId !== latestMaintenanceRecord.id);
-      const updatedBuildings = state.buildings.map(b =>
+      const updatedBuildingsRevert = state.buildings.map(b =>
         b.id === buildingId
           ? {
               ...b,
@@ -869,7 +799,7 @@ case 'CANCEL_MAINTENANCE':
 
       return {
         ...state,
-        buildings: updatedBuildings,
+        buildings: updatedBuildingsRevert,
         maintenanceRecords: newMaintenanceRecords,
         maintenanceHistory: newMaintenanceHistory,
         debtRecords: newDebtRecords,
