@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, ReactNode, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, ReactNode, useCallback, useMemo, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import {
   AppState,
@@ -37,316 +37,23 @@ const initialState: AppState = {
   incomes: [],
   currentUser: null,
   users: [],
-  notifications: [],
+  notifications: [], // Queue olarak kullanılacak
   sidebarOpen: false,
   settings: {
-    appTitle: 'TKNLİFT', // Sabit başlık
+    appTitle: 'Asansör Bakım Takip',
     logo: null,
-    companyName: 'Asansör Bakım Servisi',
+    companyName: 'GAYEM TEKİN ASANSÖR', // Varsayılan firma adı
     companyPhone: '0555 123 45 67',
     companyAddress: { mahalle: '', sokak: '', il: '', ilce: '', binaNo: '' },
     ceEmblemUrl: '/ce.png',
     tseEmblemUrl: '/ts.jpg',
-    receiptTemplate: `
-<div class="receipt-container">
-  <div class="header-section">
-    <div class="header-left">{{LOGO}}</div>
-    <div class="header-center">
-      <h1 class="company-name-title" style="font-family: Bodoni, serif;">{{COMPANY_NAME}}</h1>
-    </div>
-    <div class="header-right">
-      <!-- Dinamik sertifikalar için döngü -->
-      <div class="certificates">
-        {{#each CERTIFICATES}}
-          <img src="{{this}}" alt="Sertifika" class="certificate-img">
-        {{/each}}
-      </div>
-    </div>
-  </div>
-  <div class="receipt-title-section">
-    <h2>BAKIM - ARIZA SERVİS FORMU</h2>
-  </div>
-  <div class="contact-and-date-section">
-    <div class="contact-info">
-      <p>Servis No : {{COMPANY_PHONE}}</p>
-      <p>{{COMPANY_ADDRESS}}</p>
-    </div>
-    <div class="date-info">
-      <p style="font-weight:bold;font-size:16px;color:#333;">Tarih : {{DATE}}</p>
-    </div>
-  </div>
-  <div class="building-details-section">
-    <h3>Bina Adı : {{BUILDING_NAME}}</h3>
-    <p>Bina Adresi : {{BUILDING_ADDRESS}}</p>
-    <p>Asansör Sayısı : {{ELEVATOR_COUNT}}</p>
-  </div>
-  <div class="note-section">
-    <p>
-      Not: Bu bakımdan sonra meydana gelebilecek kapı camı kırılması, tavan aydınlatmasının kırılması durumlarında durumu hemen firmamıza bildiriniz. 
-      Kırık kapı camı ile asansörü çalıştırmayınız. Aksi takdirde olabilecek durumlardan firmamız sorumlu olmayacaktır.
-    </p>
-  </div>
-  <div class="maintenance-summary-section">
-    <h3>YAPILAN İŞLEMLER</h3>
-    <div class="summary-item">
-      <span>Bakım Yapıldı</span>
-      <span>{{MAINTENANCE_ACTION}}</span>
-    </div>
-    <!-- Dinamik bakım ücreti (asansör sayısı * bakım ücreti) -->
-    <div class="summary-item">
-      <span>Bakım Ücreti</span>
-      <span>{{MAINTENANCE_FEE}}</span>
-    </div>
-    <!-- Borç varsa göster -->
-    {{#if DEBT_SECTION}}
-      <div class="summary-item">
-        <span>Bina Borcu</span>
-        <span>{{DEBT_SECTION}}</span>
-      </div>
-    {{/if}}
-    <!-- Parçalar bölümü varsa göster -->
-    {{#if PARTS_SECTION}}
-      <div class="parts-section">
-        <div class="section-title">Takılan Parçalar</div>
-        <ul class="parts-list">
-          {{{PARTS_SECTION}}}
-        </ul>
-      </div>
-    {{/if}}
-    <!-- Toplam tutar -->
-    <div class="total-amount-section">
-      <span>Toplam Tutar:</span>
-      <span class="final-total">{{TOTAL_AMOUNT}}</span>
-    </div>
-  </div>
-  <div class="footer-warning-section">
-    <p>Uyarı: Asansör bakımı esnasında değiştirilmesi önerilen parçaların apartman yönetimi tarafından parça değişimine onay verilmemesi durumunda doğacak aksaklık ve kazalardan firmamız sorumlu değildir.</p>
-  </div>
-  <div class="signature-section">
-    <p style="font-family: Zapfino, cursive;">Asansör Firma Yetkilisi</p>
-    <p style="font-family: Zapfino, cursive;">{{TECHNICIAN}}</p>
-  </div>
-  <div class="watermark" style="background-image:url('{{LOGO}}');"></div>
-</div>
-
-<style>
-  .receipt-container {
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 30px;
-    border: 1px solid #eee;
-    box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    color: #333;
-    line-height: 1.6;
-    background: #fff;
-    overflow: hidden;
-    position: relative;
-  }
-  .watermark {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 80%;
-    height: 80%;
-    background-repeat: no-repeat;
-    background-position: center;
-    background-size: contain;
-    opacity: 0.25;
-    z-index: 0;
-    pointer-events: none;
-  }
-  .header-section {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 30px;
-    border-bottom: 2px solid #ccc;
-    padding-bottom: 15px;
-    z-index: 1;
-  }
-  .header-left .logo {
-    max-height: 80px;
-    max-width: 180px;
-    object-fit: contain;
-  }
-  .header-center {
-    text-align: center;
-    flex-grow: 1;
-  }
-  .company-name-title {
-    font-size: 28px;
-    color: #dc2626;
-    margin: 0 0 5px 0;
-    font-weight: bold;
-  }
-  .header-right {
-    display: flex;
-    gap: 15px;
-  }
-  .certificates {
-    display: flex;
-    gap: 15px;
-  }
-  .certificate-img {
-    max-height: 50px;
-    object-fit: contain;
-  }
-  .receipt-title-section {
-    text-align: center;
-    background: #dc2626;
-    color: white;
-    padding: 10px 0;
-    margin-bottom: 25px;
-    z-index: 1;
-  }
-  .receipt-title-section h2 {
-    margin: 0;
-    font-size: 22px;
-    text-transform: uppercase;
-  }
-  .contact-and-date-section {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 20px;
-    font-size: 14px;
-    color: #555;
-    z-index: 1;
-  }
-  .contact-info p, .date-info p {
-    margin: 5px 0;
-  }
-  .building-details-section {
-    background: #f8f8f8;
-    padding: 15px 20px;
-    margin-bottom: 20px;
-    border-left: 5px solid #dc2626;
-    z-index: 1;
-  }
-  .building-details-section h3 {
-    margin: 0 0 8px 0;
-    color: #333;
-    font-size: 19px;
-  }
-  .note-section {
-    background: #fffbe6;
-    border: 1px solid #ffe58f;
-    padding: 15px;
-    margin-bottom: 20px;
-    font-size: 13px;
-    color: #7a5f00;
-    border-radius: 5px;
-    z-index: 1;
-  }
-  .maintenance-summary-section {
-    margin-bottom: 20px;
-    border: 1px solid #eee;
-    padding: 15px;
-    border-radius: 5px;
-    z-index: 1;
-  }
-  .maintenance-summary-section h3 {
-    font-size: 18px;
-    font-weight: bold;
-    color: #dc2626;
-    margin-bottom: 10px;
-    padding-bottom: 5px;
-    border-bottom: 1px solid #f0f0f0;
-  }
-  .summary-item {
-    display: flex;
-    justify-content: space-between;
-    padding: 5px 0;
-    border-bottom: 1px dotted #e0e0e0;
-  }
-  .summary-item:last-child {
-    border-bottom: none;
-  }
-  .summary-item span:first-child {
-    font-weight: bold;
-    color: #444;
-  }
-  .parts-section .section-title {
-    font-size: 18px;
-    font-weight: bold;
-    color: #dc2626;
-    margin-bottom: 10px;
-    padding-bottom: 5px;
-    border-bottom: 1px solid #f0f0f0;
-  }
-  .parts-list {
-    margin: 0;
-    padding: 0 0 0 20px;
-  }
-  .parts-list li {
-    margin: 5px 0;
-  }
-  .total-amount-section {
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    align-items: flex-end;
-    background: #f3f4f6;
-    padding: 15px 20px;
-    border-top: 2px solid #dc2626;
-    margin-top: 30px;
-    font-size: 20px;
-    font-weight: bold;
-    color: #333;
-    z-index: 1;
-  }
-  .total-amount-section span:first-child {
-    width: 100%;
-    text-align: right;
-    margin-bottom: 5px;
-  }
-  .final-total {
-    color: #dc2626;
-    font-size: 24px;
-  }
-  .footer-warning-section {
-    text-align: center;
-    margin-top: 30px;
-    padding-top: 15px;
-    border-top: 1px solid #eee;
-    font-size: 13px;
-    color: #777;
-    z-index: 1;
-  }
-  .footer-warning-section p {
-    margin: 0;
-    font-weight: bold;
-    color: #dc2626;
-  }
-  .signature-section {
-    text-align: right;
-    margin-top: 30px;
-    padding-top: 15px;
-    border-top: 1px solid #eee;
-    z-index: 1;
-  }
-  @media print {
-    .receipt-container {
-      box-shadow: none;
-      border: none;
-      padding: 0;
-    }
-    .header-section, .receipt-title-section, .contact-and-date-section, .building-details-section, .note-section, .maintenance-summary-section, .parts-section, .total-amount-section, .footer-warning-section, .signature-section {
-      box-shadow: none;
-      page-break-inside: avoid;
-    }
-    .watermark {
-      opacity: 0.15;
-    }
-  }
-</style>
-    `,
+    receiptTemplate: '', // Artık bu kullanılmayacak, yerine yeni şablon geçecek
     installationProposalTemplate: '',
     maintenanceProposalTemplate: '',
     revisionProposalTemplate: '',
     faultReportTemplate: '',
     autoSaveInterval: 60,
+    certificates: ['/ce.png', '/tse.jpg'], // Dinamik sertifikalar
   },
   lastMaintenanceReset: undefined,
   faultReports: [],
@@ -515,7 +222,7 @@ function appReducer(state: AppState, action: Action): AppState {
         ],
       };
 
-    case 'INSTALL_PART': {
+    case 'INSTALL_PART':
       const installation: PartInstallation = {
         ...action.payload,
         id: uuidv4(),
@@ -564,28 +271,27 @@ function appReducer(state: AppState, action: Action): AppState {
           ...state.updates,
         ],
       };
-    }
 
-    case 'INSTALL_MANUAL_PART': {
+    case 'INSTALL_MANUAL_PART':
       const manualInstallation: ManualPartInstallation = {
         ...action.payload,
         id: uuidv4(),
         installedBy: state.currentUser?.name || 'Bilinmeyen',
         isPaid: false,
       };
-      const building = state.buildings.find(b => b.id === action.payload.buildingId);
-      const updatedBuildings = state.buildings.map(b =>
+      const buildingManual = state.buildings.find(b => b.id === action.payload.buildingId);
+      const updatedBuildingsManual = state.buildings.map(b =>
         b.id === action.payload.buildingId ? { ...b, debt: (b.debt || 0) + action.payload.totalPrice } : b
       );
-      const debtRecord: DebtRecord = {
+      const debtRecordManual: DebtRecord = {
         id: uuidv4(),
         buildingId: action.payload.buildingId,
         date: action.payload.installDate,
         type: 'part',
         description: `${action.payload.quantity} Adet ${action.payload.partName} takıldı`,
         amount: action.payload.totalPrice,
-        previousDebt: building?.debt || 0,
-        newDebt: (building?.debt || 0) + action.payload.totalPrice,
+        previousDebt: buildingManual?.debt || 0,
+        newDebt: (buildingManual?.debt || 0) + action.payload.totalPrice,
         performedBy: state.currentUser?.name || 'Bilinmeyen',
         relatedRecordId: null,
       };
@@ -593,22 +299,21 @@ function appReducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         manualPartInstallations: [...state.manualPartInstallations, manualInstallation],
-        buildings: updatedBuildings,
-        debtRecords: [...state.debtRecords, debtRecord],
+        buildings: updatedBuildingsManual,
+        debtRecords: [...state.debtRecords, debtRecordManual],
         updates: [
           {
             id: uuidv4(),
             action: 'Manuel Parça Takıldı',
             user: state.currentUser?.name || 'Bilinmeyen',
             timestamp: new Date().toISOString(),
-            details: `${building?.name || 'Bilinmeyen'} binasına ${action.payload.quantity} adet ${action.payload.partName} takıldı.`,
+            details: `${buildingManual?.name || 'Bilinmeyen'} binasına ${action.payload.quantity} adet ${action.payload.partName} takıldı.`,
           },
           ...state.updates,
         ],
       };
-    }
 
-    case 'MARK_PART_AS_PAID': {
+    case 'MARK_PART_AS_PAID':
       const { installationId, isManual } = action.payload;
       const paymentDate = new Date().toISOString();
       return {
@@ -617,69 +322,46 @@ function appReducer(state: AppState, action: Action): AppState {
           ? { manualPartInstallations: state.manualPartInstallations.map(i => (i.id === installationId ? { ...i, isPaid: true, paymentDate } : i)) }
           : { partInstallations: state.partInstallations.map(i => (i.id === installationId ? { ...i, isPaid: true, paymentDate } : i)) }),
       };
-    }
 
-    case 'ADD_UPDATE': {
+    case 'ADD_UPDATE':
       const update: Update = { ...action.payload, id: uuidv4(), timestamp: new Date().toISOString() };
       return { ...state, updates: [update, ...state.updates] };
-    }
 
-    case 'ADD_INCOME': {
+    case 'ADD_INCOME':
       const income: Income = { ...action.payload, id: uuidv4() };
       return { ...state, incomes: [...state.incomes, income] };
-    }
 
-    case 'SET_USER': {
+    case 'SET_USER':
       const existingUser = state.users.find(u => u.name === action.payload);
       const currentUser = existingUser || { id: uuidv4(), name: action.payload };
       return { ...state, currentUser, users: existingUser ? state.users : [...state.users, currentUser] };
-    }
 
     case 'DELETE_USER':
       return { ...state, users: state.users.filter(u => u.id !== action.payload) };
 
-    case 'ADD_NOTIFICATION': {
+    case 'ADD_NOTIFICATION':
       const newNotification = action.payload;
-      const updatedNotifications = [newNotification, ...state.notifications];
+      const updatedNotifications = [newNotification, ...state.notifications].slice(0, 10); // Maks 10 bildirim
       const newUnreadCount = state.unreadNotifications + 1;
-
-      console.log('Bildirim ekleniyor:', {
-        notification: newNotification,
-        previousNotifications: state.notifications,
-        newNotifications: updatedNotifications,
-        previousUnread: state.unreadNotifications,
-        newUnread: newUnreadCount,
-      });
-
-      if (updatedNotifications.length !== state.notifications.length + 1) {
-        console.error('Bildirim eklenemedi! Dizi güncellenmedi.', { state, action });
-        return state; // Hata durumunda state'i değiştirme
-      }
-
+      console.log('Bildirim eklendi:', newNotification, 'Yeni unread count:', newUnreadCount);
       return {
         ...state,
         notifications: updatedNotifications,
         unreadNotifications: newUnreadCount,
       };
-    }
 
-    case 'CLEAR_NOTIFICATIONS': {
-      console.log('Bildirimler temizleniyor:', {
-        previousNotifications: state.notifications,
-        previousUnread: state.unreadNotifications,
-      });
-
+    case 'CLEAR_NOTIFICATIONS':
+      console.log('Bildirimler temizlendi, unreadNotifications 0 olarak ayarlandı.');
       return {
         ...state,
         notifications: [],
         unreadNotifications: 0,
       };
-    }
 
     case 'TOGGLE_SIDEBAR':
       return { ...state, sidebarOpen: !state.sidebarOpen };
 
-    case 'TOGGLE_MAINTENANCE': {
+    case 'TOGGLE_MAINTENANCE':
       const { buildingId, showReceipt } = action.payload;
       const targetBuilding = state.buildings.find(b => b.id === buildingId);
 
@@ -796,16 +478,15 @@ function appReducer(state: AppState, action: Action): AppState {
         };
       }
       return finalState;
-    }
 
-    case 'REPORT_FAULT': {
-      const { buildingId, faultData } = action.payload;
-      const faultBuilding = state.buildings.find(b => b.id === buildingId);
+    case 'REPORT_FAULT':
+      const { buildingId: faultBuildingId, faultData } = action.payload;
+      const faultBuilding = state.buildings.find(b => b.id === faultBuildingId);
 
       if (!faultBuilding) return state;
 
       const updatedBuildings = state.buildings.map(b =>
-        b.id === buildingId
+        b.id === faultBuildingId
           ? {
               ...b,
               isDefective: true,
@@ -836,13 +517,9 @@ function appReducer(state: AppState, action: Action): AppState {
         ],
         unreadNotifications: state.unreadNotifications + 1,
       };
-    }
 
-    case 'UPDATE_SETTINGS': {
-      // appTitle sabit, güncellenmesini engelle
-      const { appTitle, ...rest } = action.payload;
-      return { ...state, settings: { ...state.settings, ...rest } };
-    }
+    case 'UPDATE_SETTINGS':
+      return { ...state, settings: { ...state.settings, ...action.payload } };
 
     case 'RESET_MAINTENANCE_STATUS':
       return {
@@ -861,7 +538,7 @@ function appReducer(state: AppState, action: Action): AppState {
         ],
       };
 
-    case 'ADD_FAULT_REPORT': {
+    case 'ADD_FAULT_REPORT':
       const faultReport: FaultReport = {
         ...action.payload,
         id: uuidv4(),
@@ -874,7 +551,6 @@ function appReducer(state: AppState, action: Action): AppState {
         notifications: [`Yeni arıza bildirimi: ${action.payload.reporterName} ${action.payload.reporterSurname}`, ...state.notifications],
         unreadNotifications: state.unreadNotifications + 1,
       };
-    }
 
     case 'RESOLVE_FAULT_REPORT':
       return {
@@ -882,36 +558,31 @@ function appReducer(state: AppState, action: Action): AppState {
         faultReports: state.faultReports.map(r => (r.id === action.payload ? { ...r, status: 'resolved' } : r)),
       };
 
-    case 'ADD_MAINTENANCE_HISTORY': {
+    case 'ADD_MAINTENANCE_HISTORY':
       const maintenanceHistory: MaintenanceHistory = { ...action.payload, id: uuidv4() };
       return { ...state, maintenanceHistory: [...state.maintenanceHistory, maintenanceHistory] };
-    }
 
-    case 'ADD_MAINTENANCE_RECORD': {
+    case 'ADD_MAINTENANCE_RECORD':
       const newMaintenanceRecord: MaintenanceRecord = { ...action.payload, id: uuidv4() };
       return { ...state, maintenanceRecords: [...state.maintenanceRecords, newMaintenanceRecord] };
-    }
 
-    case 'ADD_PRINTER': {
+    case 'ADD_PRINTER':
       const newPrinter: Printer = { ...action.payload, id: uuidv4() };
       const updatedPrinters = newPrinter.isDefault ? state.printers.map(p => ({ ...p, isDefault: false })) : state.printers;
       return { ...state, printers: [...updatedPrinters, newPrinter] };
-    }
 
-    case 'UPDATE_PRINTER': {
+    case 'UPDATE_PRINTER':
       const updatedPrinters = action.payload.isDefault
         ? state.printers.map(p => (p.id === action.payload.id ? action.payload : { ...p, isDefault: false }))
         : state.printers.map(p => (p.id === action.payload.id ? action.payload : p));
       return { ...state, printers: updatedPrinters };
-    }
 
     case 'DELETE_PRINTER':
       return { ...state, printers: state.printers.filter(p => p.id !== action.payload) };
 
-    case 'ADD_SMS_TEMPLATE': {
+    case 'ADD_SMS_TEMPLATE':
       const newSMSTemplate: SMSTemplate = { ...action.payload, id: uuidv4() };
       return { ...state, smsTemplates: [...state.smsTemplates, newSMSTemplate] };
-    }
 
     case 'UPDATE_SMS_TEMPLATE':
       return { ...state, smsTemplates: state.smsTemplates.map(t => (t.id === action.payload.id ? action.payload : t)) };
@@ -923,7 +594,7 @@ function appReducer(state: AppState, action: Action): AppState {
       console.log('Sending SMS to buildings:', action.payload.buildingIds);
       return state;
 
-    case 'SEND_WHATSAPP': {
+    case 'SEND_WHATSAPP':
       const { templateId, buildingIds } = action.payload;
       const template = state.smsTemplates.find(t => t.id === templateId);
       if (template) {
@@ -937,9 +608,8 @@ function appReducer(state: AppState, action: Action): AppState {
         });
       }
       return state;
-    }
 
-    case 'ADD_PROPOSAL': {
+    case 'ADD_PROPOSAL':
       const newProposal: Proposal = {
         ...action.payload,
         id: uuidv4(),
@@ -947,7 +617,6 @@ function appReducer(state: AppState, action: Action): AppState {
         createdBy: state.currentUser?.name || 'Bilinmeyen',
       };
       return { ...state, proposals: [...state.proposals, newProposal] };
-    }
 
     case 'UPDATE_PROPOSAL':
       return { ...state, proposals: state.proposals.map(p => (p.id === action.payload.id ? action.payload : p)) };
@@ -955,7 +624,7 @@ function appReducer(state: AppState, action: Action): AppState {
     case 'DELETE_PROPOSAL':
       return { ...state, proposals: state.proposals.filter(p => p.id !== action.payload) };
 
-    case 'ADD_PAYMENT': {
+    case 'ADD_PAYMENT':
       const payment: Payment = { ...action.payload, id: uuidv4() };
       const updatedBuildings = state.buildings.map(b =>
         b.id === action.payload.buildingId ? { ...b, debt: Math.max(0, (b.debt || 0) - action.payload.amount) } : b
@@ -993,12 +662,10 @@ function appReducer(state: AppState, action: Action): AppState {
           ...state.updates,
         ],
       };
-    }
 
-    case 'ADD_PROPOSAL_TEMPLATE': {
+    case 'ADD_PROPOSAL_TEMPLATE':
       const newProposalTemplate: ProposalTemplate = { ...action.payload, id: uuidv4() };
       return { ...state, proposalTemplates: [...state.proposalTemplates, newProposalTemplate] };
-    }
 
     case 'UPDATE_PROPOSAL_TEMPLATE':
       return { ...state, proposalTemplates: state.proposalTemplates.map(t => (t.id === action.payload.id ? action.payload : t)) };
@@ -1006,18 +673,16 @@ function appReducer(state: AppState, action: Action): AppState {
     case 'DELETE_PROPOSAL_TEMPLATE':
       return { ...state, proposalTemplates: state.proposalTemplates.filter(t => t.id !== action.payload) };
 
-    case 'ADD_QR_CODE_DATA': {
+    case 'ADD_QR_CODE_DATA':
       const newQRCode: QRCodeData = { ...action.payload, id: uuidv4() };
       return { ...state, qrCodes: [...state.qrCodes, newQRCode] };
-    }
 
-    case 'UPDATE_AUTO_SAVE_DATA': {
+    case 'UPDATE_AUTO_SAVE_DATA':
       const index = state.autoSaveData.findIndex(
         data => data.formType === action.payload.formType && data.userId === action.payload.userId
       );
       const updatedAutoSaveData = index >= 0 ? state.autoSaveData.map((d, i) => (i === index ? action.payload : d)) : [...state.autoSaveData, action.payload];
       return { ...state, autoSaveData: updatedAutoSaveData, lastAutoSave: action.payload.timestamp };
-    }
 
     case 'SHOW_RECEIPT_MODAL':
       return { ...state, showReceiptModal: true, receiptModalHtml: action.payload };
@@ -1025,19 +690,17 @@ function appReducer(state: AppState, action: Action): AppState {
     case 'CLOSE_RECEIPT_MODAL':
       return { ...state, showReceiptModal: false, receiptModalHtml: null };
 
-    case 'ARCHIVE_RECEIPT': {
+    case 'ARCHIVE_RECEIPT':
       const archivedReceipt: ArchivedReceipt = { ...action.payload, id: uuidv4() };
       return { ...state, archivedReceipts: [...state.archivedReceipts, archivedReceipt] };
-    }
 
-    case 'SHOW_ARCHIVED_RECEIPT': {
+    case 'SHOW_ARCHIVED_RECEIPT':
       const receipt = state.archivedReceipts.find(ar => ar.id === action.payload);
       return receipt
         ? { ...state, showReceiptModal: true, receiptModalHtml: receipt.htmlContent }
         : { ...state, showReceiptModal: false, receiptModalHtml: null };
-    }
 
-    case 'REMOVE_MAINTENANCE_STATUS_MARK': {
+    case 'REMOVE_MAINTENANCE_STATUS_MARK':
       const building = state.buildings.find(b => b.id === action.payload);
       return {
         ...state,
@@ -1053,14 +716,13 @@ function appReducer(state: AppState, action: Action): AppState {
           ...state.updates,
         ],
       };
-    }
 
-    case 'CANCEL_MAINTENANCE': {
-      const building = state.buildings.find(b => b.id === action.payload);
-      if (!building) return state;
+    case 'CANCEL_MAINTENANCE':
+      const buildingCancel = state.buildings.find(b => b.id === action.payload);
+      if (!buildingCancel) return state;
 
       const currentMonth = new Date().toISOString().substring(0, 7);
-      let updatedBuildings = state.buildings.map(b =>
+      let updatedBuildingsCancel = state.buildings.map(b =>
         b.id === action.payload ? { ...b, isMaintained: false, lastMaintenanceDate: undefined, lastMaintenanceTime: undefined } : b
       );
       let updatedDebtRecords = [...state.debtRecords];
@@ -1073,7 +735,7 @@ function appReducer(state: AppState, action: Action): AppState {
       if (lastDebtIndex !== -1) {
         const debtAmount = updatedDebtRecords[lastDebtIndex].amount;
         updatedDebtRecords.splice(lastDebtIndex, 1);
-        updatedBuildings = updatedBuildings.map(b =>
+        updatedBuildingsCancel = updatedBuildingsCancel.map(b =>
           b.id === action.payload ? { ...b, debt: Math.max(0, (b.debt || 0) - debtAmount) } : b
         );
       }
@@ -1090,7 +752,7 @@ function appReducer(state: AppState, action: Action): AppState {
 
       return {
         ...state,
-        buildings: updatedBuildings,
+        buildings: updatedBuildingsCancel,
         debtRecords: updatedDebtRecords,
         maintenanceHistory: updatedMaintenanceHistory,
         maintenanceRecords: updatedMaintenanceRecords,
@@ -1100,17 +762,16 @@ function appReducer(state: AppState, action: Action): AppState {
             action: 'Bakım İptal Edildi',
             user: state.currentUser?.name || 'Bilinmeyen',
             timestamp: new Date().toISOString(),
-            details: `${building.name} binasının son bakımı iptal edildi.`,
+            details: `${buildingCancel.name} binasının son bakımı iptal edildi.`,
           },
           ...state.updates,
         ],
       };
-    }
 
-    case 'REVERT_MAINTENANCE': {
+    case 'REVERT_MAINTENANCE':
       const buildingId = action.payload;
-      const building = state.buildings.find(b => b.id === buildingId);
-      if (!building) return state;
+      const buildingRevert = state.buildings.find(b => b.id === buildingId);
+      if (!buildingRevert) return state;
 
       const latestMaintenanceRecord = state.maintenanceRecords
         .filter(mr => mr.buildingId === buildingId)
@@ -1125,7 +786,13 @@ function appReducer(state: AppState, action: Action): AppState {
       const newArchivedReceipts = state.archivedReceipts.filter(ar => ar.relatedRecordId !== latestMaintenanceRecord.id);
       const updatedBuildings = state.buildings.map(b =>
         b.id === buildingId
-          ? { ...b, isMaintained: false, lastMaintenanceDate: undefined, lastMaintenanceTime: undefined, debt: Math.max(0, (b.debt || 0) - latestMaintenanceRecord.totalFee) }
+          ? {
+              ...b,
+              isMaintained: false,
+              lastMaintenanceDate: undefined,
+              lastMaintenanceTime: undefined,
+              debt: Math.max(0, (b.debt || 0) - latestMaintenanceRecord.totalFee),
+            }
           : b
       );
 
@@ -1142,12 +809,11 @@ function appReducer(state: AppState, action: Action): AppState {
             action: 'Bakım Geri Alındı',
             user: state.currentUser?.name || 'Bilinmeyen',
             timestamp: new Date().toISOString(),
-            details: `${building.name} binasının son bakımı geri alındı.`,
+            details: `${buildingRevert.name} binasının son bakımı geri alındı.`,
           },
           ...state.updates,
         ],
       };
-    }
 
     case 'SHOW_PRINTER_SELECTION':
       return { ...state, showPrinterSelectionModal: true, printerSelectionContent: action.payload };
@@ -1155,7 +821,7 @@ function appReducer(state: AppState, action: Action): AppState {
     case 'CLOSE_PRINTER_SELECTION':
       return { ...state, showPrinterSelectionModal: false, printerSelectionContent: null };
 
-    case 'INCREASE_PRICES': {
+    case 'INCREASE_PRICES':
       const percentage = action.payload;
       const updatedParts = state.parts.map(part => ({
         ...part,
@@ -1175,19 +841,26 @@ function appReducer(state: AppState, action: Action): AppState {
           ...state.updates,
         ],
       };
-    }
 
     default:
       return state;
   }
 }
 
-// Bakım fişi HTML'ini oluşturan yardımcı fonksiyon
+// Yeni bakım fişi şablonu
 function generateMaintenanceReceipt(building: Building, state: AppState, technician: string): string {
+  const {
+    logo,
+    companyName,
+    companyPhone,
+    companyAddress,
+    certificates = [],
+  } = state.settings;
+
   const currentDate = new Date().toLocaleDateString('tr-TR');
   const maintenanceFee = building.maintenanceFee * building.elevatorCount;
-  const companyAddress = state.settings.companyAddress
-    ? `${state.settings.companyAddress.mahalle} ${state.settings.companyAddress.sokak} No:${state.settings.companyAddress.binaNo}, ${state.settings.companyAddress.ilce}/${state.settings.companyAddress.il}`
+  const companyAddressStr = companyAddress
+    ? `${companyAddress.mahalle} ${companyAddress.sokak} No:${companyAddress.binaNo}, ${companyAddress.ilce}/${companyAddress.il}`
     : 'Adres belirtilmemiş';
   const currentMonth = new Date().toISOString().substring(0, 7);
   const installedParts = [
@@ -1223,35 +896,285 @@ function generateMaintenanceReceipt(building: Building, state: AppState, technic
     `;
   }
 
-  let maintenanceNoteSectionHtml = building.maintenanceNote && building.maintenanceNote.trim()
-    ? `<div class="note-section"><h3>BAKIM NOTU</h3><p>${building.maintenanceNote}</p></div>`
-    : '';
+  const debtSectionHtml = building.debt > 0 ? `<div class="summary-item"><span>Bina Borcu</span><span>${building.debt.toLocaleString('tr-TR')} ₺</span></div>` : '';
+  const totalAmount = maintenanceFee + totalPartsCost + (building.debt || 0);
 
-  let buildingCurrentDebtSectionHtml = building.debt > 0
-    ? `<p class="building-current-debt">Binanın Güncel Borcu: ${building.debt.toLocaleString('tr-TR')} ₺</p>`
-    : '';
+  const certificateImages = certificates
+    .map(cert => `<img src="${cert}" alt="Sertifika" class="certificate-img">`)
+    .join('');
 
-  const finalTotalAmount = maintenanceFee + totalPartsCost;
-  let htmlContent = state.settings.receiptTemplate || '';
+  const template = `
+    <div class="receipt-container">
+      <div class="header-section">
+        <div class="header-left">${logo ? `<img src="${logo}" alt="Logo" class="logo">` : ''}</div>
+        <div class="header-center">
+          <h1 class="company-name-title" style="font-family: Bodoni, serif;">${companyName}</h1>
+        </div>
+        <div class="header-right">
+          <div class="certificates">${certificateImages}</div>
+        </div>
+      </div>
+      <div class="receipt-title-section">
+        <h2>BAKIM - ARIZA SERVİS FORMU</h2>
+      </div>
+      <div class="contact-and-date-section">
+        <div class="contact-info">
+          <p>Servis No : ${companyPhone}</p>
+          <p>${companyAddressStr}</p>
+        </div>
+        <div class="date-info">
+          <p style="font-weight:bold;font-size:16px;color:#333;">Tarih : ${currentDate}</p>
+        </div>
+      </div>
+      <div class="building-details-section">
+        <h3>Bina Adı : ${building.name}</h3>
+        <p>Bina Adresi : ${building.address || 'Adres belirtilmemiş'}</p>
+        <p>Asansör Sayısı : ${building.elevatorCount}</p>
+      </div>
+      <div class="note-section">
+        <p>
+          Not: Bu bakımdan sonra meydana gelebilecek kapı camı kırılması, tavan aydınlatmasının kırılması durumlarında durumu hemen firmamıza bildiriniz. 
+          Kırık kapı camı ile asansörü çalıştırmayınız. Aksi takdirde olabilecek durumlardan firmamız sorumlu olmayacaktır.
+        </p>
+      </div>
+      <div class="maintenance-summary-section">
+        <h3>YAPILAN İŞLEMLER</h3>
+        <div class="summary-item">
+          <span>Bakım Yapıldı</span>
+          <span>${building.elevatorCount} asansör için ${maintenanceFee.toLocaleString('tr-TR')} ₺</span>
+        </div>
+        ${debtSectionHtml}
+        ${partsSectionHtml}
+        <div class="total-amount-section">
+          <span>Toplam Tutar:</span>
+          <span class="final-total">${totalAmount.toLocaleString('tr-TR')} ₺</span>
+        </div>
+      </div>
+      <div class="footer-warning-section">
+        <p>Uyarı: Asansör bakımı esnasında değiştirilmesi önerilen parçaların apartman yönetimi tarafından parça değişimine onay verilmemesi durumunda doğacak aksaklık ve kazalardan firmamız sorumlu değildir.</p>
+      </div>
+      <div class="signature-section">
+        <p style="font-family: Zapfino, cursive;">Asansör Firma Yetkilisi</p>
+        <p style="font-family: Zapfino, cursive;">${technician}</p>
+      </div>
+      <div class="watermark" style="background-image:url('${logo || ''}');"></div>
+    </div>
 
-  htmlContent = htmlContent
-    .replace(/{{LOGO_WATERMARK_URL}}/g, '/tknlift-logo.png')
-    .replace(/{{CE_EMBLEM}}/g, state.settings.ceEmblemUrl ? `<img src="${state.settings.ceEmblemUrl}" alt="CE Amblemi">` : '')
-    .replace(/{{TSE_EMBLEM}}/g, state.settings.tseEmblemUrl ? `<img src="${state.settings.tseEmblemUrl}" alt="TSE Amblemi">` : '')
-    .replace(/{{COMPANY_NAME}}/g, state.settings.companyName)
-    .replace(/{{COMPANY_PHONE}}/g, state.settings.companyPhone)
-    .replace(/{{COMPANY_ADDRESS}}/g, companyAddress)
-    .replace(/{{BUILDING_NAME}}/g, building.name)
-    .replace(/{{DATE}}/g, currentDate)
-    .replace(/{{MAINTENANCE_FEE_CALCULATED}}/g, `${maintenanceFee.toLocaleString('tr-TR')} ₺`)
-    .replace(/{{TECHNICIAN_NAME}}/g, technician)
-    .replace(/{{PARTS_SECTION}}/g, partsSectionHtml)
-    .replace(/{{MAINTENANCE_NOTE_SECTION}}/g, maintenanceNoteSectionHtml)
-    .replace(/{{FINAL_TOTAL_AMOUNT}}/g, `${finalTotalAmount.toLocaleString('tr-TR')} ₺`)
-    .replace(/{{BUILDING_CURRENT_DEBT_SECTION}}/g, buildingCurrentDebtSectionHtml)
-    .replace(/{{DEBT_SECTION}}/g, '');
+    <style>
+      .receipt-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 30px;
+        border: 1px solid #eee;
+        box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        color: #333;
+        line-height: 1.6;
+        background: #fff;
+        overflow: hidden;
+        position: relative;
+      }
+      .watermark {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80%;
+        height: 80%;
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: contain;
+        opacity: 0.25;
+        z-index: 0;
+        pointer-events: none;
+      }
+      .header-section {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        border-bottom: 2px solid #ccc;
+        padding-bottom: 15px;
+        z-index: 1;
+      }
+      .header-left .logo {
+        max-height: 80px;
+        max-width: 180px;
+        object-fit: contain;
+      }
+      .header-center {
+        text-align: center;
+        flex-grow: 1;
+      }
+      .company-name-title {
+        font-size: 28px;
+        color: #dc2626;
+        margin: 0 0 5px 0;
+        font-weight: bold;
+      }
+      .header-right {
+        display: flex;
+        gap: 15px;
+      }
+      .certificates {
+        display: flex;
+        gap: 15px;
+      }
+      .certificate-img {
+        max-height: 50px;
+        object-fit: contain;
+      }
+      .receipt-title-section {
+        text-align: center;
+        background: #dc2626;
+        color: white;
+        padding: 10px 0;
+        margin-bottom: 25px;
+        z-index: 1;
+      }
+      .receipt-title-section h2 {
+        margin: 0;
+        font-size: 22px;
+        text-transform: uppercase;
+      }
+      .contact-and-date-section {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 20px;
+        font-size: 14px;
+        color: #555;
+        z-index: 1;
+      }
+      .contact-info p, .date-info p {
+        margin: 5px 0;
+      }
+      .building-details-section {
+        background: #f8f8f8;
+        padding: 15px 20px;
+        margin-bottom: 20px;
+        border-left: 5px solid #dc2626;
+        z-index: 1;
+      }
+      .building-details-section h3 {
+        margin: 0 0 8px 0;
+        color: #333;
+        font-size: 19px;
+      }
+      .note-section {
+        background: #fffbe6;
+        border: 1px solid #ffe58f;
+        padding: 15px;
+        margin-bottom: 20px;
+        font-size: 13px;
+        color: #7a5f00;
+        border-radius: 5px;
+        z-index: 1;
+      }
+      .maintenance-summary-section {
+        margin-bottom: 20px;
+        border: 1px solid #eee;
+        padding: 15px;
+        border-radius: 5px;
+        z-index: 1;
+      }
+      .maintenance-summary-section h3 {
+        font-size: 18px;
+        font-weight: bold;
+        color: #dc2626;
+        margin-bottom: 10px;
+        padding-bottom: 5px;
+        border-bottom: 1px solid #f0f0f0;
+      }
+      .summary-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 5px 0;
+        border-bottom: 1px dotted #e0e0e0;
+      }
+      .summary-item:last-child {
+        border-bottom: none;
+      }
+      .summary-item span:first-child {
+        font-weight: bold;
+        color: #444;
+      }
+      .parts-section .section-title {
+        font-size: 18px;
+        font-weight: bold;
+        color: #dc2626;
+        margin-bottom: 10px;
+        padding-bottom: 5px;
+        border-bottom: 1px solid #f0f0f0;
+      }
+      .parts-list {
+        margin: 0;
+        padding: 0 0 0 20px;
+      }
+      .parts-list li {
+        margin: 5px 0;
+      }
+      .total-amount-section {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        align-items: flex-end;
+        background: #f3f4f6;
+        padding: 15px 20px;
+        border-top: 2px solid #dc2626;
+        margin-top: 30px;
+        font-size: 20px;
+        font-weight: bold;
+        color: #333;
+        z-index: 1;
+      }
+      .total-amount-section span:first-child {
+        width: 100%;
+        text-align: right;
+        margin-bottom: 5px;
+      }
+      .final-total {
+        color: #dc2626;
+        font-size: 24px;
+      }
+      .footer-warning-section {
+        text-align: center;
+        margin-top: 30px;
+        padding-top: 15px;
+        border-top: 1px solid #eee;
+        font-size: 13px;
+        color: #777;
+        z-index: 1;
+      }
+      .footer-warning-section p {
+        margin: 0;
+        font-weight: bold;
+        color: #dc2626;
+      }
+      .signature-section {
+        text-align: right;
+        margin-top: 30px;
+        padding-top: 15px;
+        border-top: 1px solid #eee;
+        z-index: 1;
+      }
+      @media print {
+        .receipt-container {
+          box-shadow: none;
+          border: none;
+          padding: 0;
+        }
+        .header-section, .receipt-title-section, .contact-and-date-section, .building-details-section, .note-section, .maintenance-summary-section, .parts-section, .total-amount-section, .footer-warning-section, .signature-section {
+          box-shadow: none;
+          page-break-inside: avoid;
+        }
+        .watermark {
+          opacity: 0.15;
+        }
+      }
+    </style>
+  `;
 
-  return htmlContent;
+  return template;
 }
 
 const AppContext = createContext<{
@@ -1313,7 +1236,6 @@ const AppContext = createContext<{
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(appReducer, initialState);
 
-  // State değişikliklerini izlemek için debug
   useEffect(() => {
     console.log('State güncellendi:', { notifications: state.notifications, unreadNotifications: state.unreadNotifications });
   }, [state.notifications, state.unreadNotifications]);
@@ -1331,14 +1253,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const addIncome = (income: Omit<Income, 'id'>) => dispatch({ type: 'ADD_INCOME', payload: income });
   const setUser = (name: string) => dispatch({ type: 'SET_USER', payload: name });
   const deleteUser = (id: string) => dispatch({ type: 'DELETE_USER', payload: id });
-  const addNotification = (notification: string) => {
-    console.log('addNotification çağrıldı:', { notification, currentUnread: state.unreadNotifications });
-    dispatch({ type: 'ADD_NOTIFICATION', payload: notification });
-  };
-  const clearNotifications = () => {
-    console.log('clearNotifications çağrıldı:', { currentUnread: state.unreadNotifications });
-    dispatch({ type: 'CLEAR_NOTIFICATIONS' });
-  };
+  const addNotification = (notification: string) => dispatch({ type: 'ADD_NOTIFICATION', payload: notification });
+  const clearNotifications = () => dispatch({ type: 'CLEAR_NOTIFICATIONS' });
   const toggleSidebar = () => dispatch({ type: 'TOGGLE_SIDEBAR' });
   const toggleMaintenance = (buildingId: string, showReceipt = false) => dispatch({ type: 'TOGGLE_MAINTENANCE', payload: { buildingId, showReceipt } });
   const reportFault = (buildingId: string, faultData: { description: string; severity: 'low' | 'medium' | 'high'; reportedBy: string }) =>
@@ -1389,67 +1305,120 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     [state.archivedReceipts]
   );
 
-  return (
-    <AppContext.Provider
-      value={{
-        state,
-        addBuilding,
-        updateBuilding,
-        deleteBuilding,
-        addPart,
-        updatePart,
-        deletePart,
-        installPart,
-        installManualPart,
-        markPartAsPaid,
-        addUpdate,
-        addIncome,
-        setUser,
-        deleteUser,
-        addNotification,
-        clearNotifications,
-        toggleSidebar,
-        toggleMaintenance,
-        reportFault,
-        updateSettings,
-        resetMaintenanceStatus,
-        addFaultReport,
-        resolveFaultReport,
-        addMaintenanceHistory,
-        addMaintenanceRecord,
-        addPrinter,
-        updatePrinter,
-        deletePrinter,
-        addSMSTemplate,
-        updateSMSTemplate,
-        deleteSMSTemplate,
-        sendBulkSMS,
-        sendWhatsApp,
-        addProposal,
-        updateProposal,
-        deleteProposal,
-        addPayment,
-        addProposalTemplate,
-        updateProposalTemplate,
-        deleteProposalTemplate,
-        addQRCodeData,
-        updateAutoSaveData,
-        showReceiptModal,
-        closeReceiptModal,
-        archiveReceipt,
-        showPrinterSelection,
-        closePrinterSelection,
-        increasePrices,
-        showArchivedReceipt,
-        removeMaintenanceStatusMark,
-        cancelMaintenance,
-        revertMaintenance,
-        getLatestArchivedReceiptHtml,
-      }}
-    >
-      {children}
-    </AppContext.Provider>
+  const contextValue = useMemo(
+    () => ({
+      state,
+      addBuilding,
+      updateBuilding,
+      deleteBuilding,
+      addPart,
+      updatePart,
+      deletePart,
+      installPart,
+      installManualPart,
+      markPartAsPaid,
+      addUpdate,
+      addIncome,
+      setUser,
+      deleteUser,
+      addNotification,
+      clearNotifications,
+      toggleSidebar,
+      toggleMaintenance,
+      reportFault,
+      updateSettings,
+      resetMaintenanceStatus,
+      addFaultReport,
+      resolveFaultReport,
+      addMaintenanceHistory,
+      addMaintenanceRecord,
+      addPrinter,
+      updatePrinter,
+      deletePrinter,
+      addSMSTemplate,
+      updateSMSTemplate,
+      deleteSMSTemplate,
+      sendBulkSMS,
+      sendWhatsApp,
+      addProposal,
+      updateProposal,
+      deleteProposal,
+      addPayment,
+      addProposalTemplate,
+      updateProposalTemplate,
+      deleteProposalTemplate,
+      addQRCodeData,
+      updateAutoSaveData,
+      showReceiptModal,
+      closeReceiptModal,
+      archiveReceipt,
+      showPrinterSelection,
+      closePrinterSelection,
+      increasePrices,
+      showArchivedReceipt,
+      removeMaintenanceStatusMark,
+      cancelMaintenance,
+      revertMaintenance,
+      getLatestArchivedReceiptHtml,
+    }),
+    [
+      state,
+      addBuilding,
+      updateBuilding,
+      deleteBuilding,
+      addPart,
+      updatePart,
+      deletePart,
+      installPart,
+      installManualPart,
+      markPartAsPaid,
+      addUpdate,
+      addIncome,
+      setUser,
+      deleteUser,
+      addNotification,
+      clearNotifications,
+      toggleSidebar,
+      toggleMaintenance,
+      reportFault,
+      updateSettings,
+      resetMaintenanceStatus,
+      addFaultReport,
+      resolveFaultReport,
+      addMaintenanceHistory,
+      addMaintenanceRecord,
+      addPrinter,
+      updatePrinter,
+      deletePrinter,
+      addSMSTemplate,
+      updateSMSTemplate,
+      deleteSMSTemplate,
+      sendBulkSMS,
+      sendWhatsApp,
+      addProposal,
+      updateProposal,
+      deleteProposal,
+      addPayment,
+      addProposalTemplate,
+      updateProposalTemplate,
+      deleteProposalTemplate,
+      addQRCodeData,
+      updateAutoSaveData,
+      showReceiptModal,
+      closeReceiptModal,
+      archiveReceipt,
+      showPrinterSelection,
+      closePrinterSelection,
+      increasePrices,
+      showArchivedReceipt,
+      removeMaintenanceStatusMark,
+      cancelMaintenance,
+      revertMaintenance,
+      getLatestArchivedReceiptHtml,
+    ]
   );
+
+  return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
 };
 
 export const useApp = () => {
