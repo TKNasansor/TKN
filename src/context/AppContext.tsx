@@ -40,7 +40,7 @@ const initialState: AppState = {
   notifications: [],
   sidebarOpen: false,
   settings: {
-    appTitle: 'Asansör Bakım Takip',
+    appTitle: 'TKNLİFT',
     logo: null,
     companyName: 'Asansör Bakım Servisi',
     companyPhone: '0555 123 45 67',
