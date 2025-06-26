@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { Plus, X, Edit, Trash2, Eye, ChevronLeft, Upload } from 'lucide-react';
+import { Building } from '../types'; // Building tipini import edin
 
 const ProposalTypePage: React.FC = () => {
   const { type } = useParams<{ type: string }>();
@@ -13,6 +14,7 @@ const ProposalTypePage: React.FC = () => {
   const [selectedTemplate, setSelectedTemplate] = useState('');
   
   const [proposalForm, setProposalForm] = useState({
+    buildingId: '', // YENİ EKLENDİ
     buildingName: '',
     title: '',
     description: '',
@@ -135,6 +137,7 @@ const ProposalTypePage: React.FC = () => {
 
   const resetForm = () => {
     setProposalForm({
+      buildingId: '', // YENİ EKLENDİ
       buildingName: '',
       title: '',
       description: '',
@@ -149,6 +152,7 @@ const ProposalTypePage: React.FC = () => {
 
   const handleEdit = (proposal: any) => {
     setProposalForm({
+      buildingId: proposal.buildingId || '', // YENİ EKLENDİ
       buildingName: proposal.buildingName,
       title: proposal.title,
       description: proposal.description,
@@ -163,113 +167,85 @@ const ProposalTypePage: React.FC = () => {
     setShowForm(true);
   };
 
+  // Yer tutucuları değiştiren yardımcı fonksiyon
+  const replacePlaceholders = (htmlContent: string, values: Record<string, any>) => {
+    let result = htmlContent;
+    for (const key in values) {
+      if (Object.prototype.hasOwnProperty.call(values, key)) {
+        const placeholder = new RegExp(`{{${key}}}`, 'g');
+        result = result.replace(placeholder, values[key] !== undefined && values[key] !== null ? values[key].toString() : '');
+      }
+    }
+    return result;
+  };
+
+  const getFullAddress = (building: Building) => {
+    if (!building.address) return 'Belirtilmemiş';
+    const { mahalle, sokak, binaNo, ilce, il } = building.address;
+    return `${mahalle} ${sokak} ${binaNo}, ${ilce}/${il}`.trim();
+  };
+
   const generateProposalPreview = (proposal: any) => {
     const template = state.proposalTemplates.find(t => t.id === proposal.templateId);
-    const templateContent = template ? 
-      state.settings?.[`${proposal.type}ProposalTemplate` as keyof typeof state.settings] || '' : '';
+    if (!template) return '';
 
-    return `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>${proposal.title}</title>
-          <style>
-            body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
-            .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
-            .company-name { font-size: 24px; font-weight: bold; color: #333; }
-            .proposal-title { font-size: 20px; color: #666; margin-top: 10px; }
-            .content { margin-bottom: 30px; }
-            .building-info { background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0; }
-            .custom-fields { margin: 20px 0; }
-            .field { margin: 10px 0; }
-            .field-label { font-weight: bold; }
-            .items-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-            .items-table th, .items-table td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-            .items-table th { background-color: #f2f2f2; font-weight: bold; }
-            .total { font-size: 18px; font-weight: bold; text-align: right; margin-top: 20px; }
-            .footer { border-top: 2px solid #333; padding-top: 20px; text-align: center; margin-top: 30px; }
-            @media print { .actions { display: none; } }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div class="company-name">${state.settings?.companyName || 'Asansör Bakım Servisi'}</div>
-            <div class="proposal-title">${proposalTypes[proposal.type]}</div>
-          </div>
-          
-          <div class="content">
-            <h2>${proposal.title}</h2>
-            
-            <div class="building-info">
-              <strong>Bina:</strong> ${proposal.buildingName}<br>
-              <strong>Tarih:</strong> ${new Date(proposal.createdDate).toLocaleDateString('tr-TR')}<br>
-              <strong>Hazırlayan:</strong> ${proposal.createdBy}
-            </div>
-            
-            <p>${proposal.description}</p>
-            
-            ${template && template.fields.length > 0 ? `
-              <div class="custom-fields">
-                <h3>Detaylar</h3>
-                ${template.fields.map((field: any) => `
-                  <div class="field">
-                    <span class="field-label">${field.label}:</span>
-                    <span>${proposal.fieldValues[field.name] || '-'}</span>
-                  </div>
-                `).join('')}
-              </div>
-            ` : ''}
-            
-            <table class="items-table">
-              <thead>
-                <tr>
-                  <th>Açıklama</th>
-                  <th>Miktar</th>
-                  <th>Birim Fiyat</th>
-                  <th>Toplam</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${proposal.items.map((item: any) => `
-                  <tr>
-                    <td>${item.description}</td>
-                    <td>${item.quantity}</td>
-                    <td>${item.unitPrice.toLocaleString('tr-TR')} ₺</td>
-                    <td>${item.totalPrice.toLocaleString('tr-TR')} ₺</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-            
-            <div class="total">
-              Toplam Tutar: ${proposal.totalAmount.toLocaleString('tr-TR')} ₺
-            </div>
+    const building = state.buildings.find(b => b.id === proposal.buildingId);
+    const companyAddress = state.settings?.companyAddress ? 
+      `${state.settings.companyAddress.mahalle} ${state.settings.companyAddress.sokak} ${state.settings.companyAddress.binaNo}, ${state.settings.companyAddress.ilce}/${state.settings.companyAddress.il}` : 
+      'Adres belirtilmemiş';
 
-            ${proposal.pdfAttachment ? `
-              <div style="margin-top: 30px;">
-                <h3>Ekli PDF</h3>
-                <iframe 
-                  src="${proposal.pdfAttachment}" 
-                  width="100%" 
-                  height="600px" 
-                  style="border: none;"
-                ></iframe>
-              </div>
-            ` : ''}
-          </div>
-          
-          <div class="footer">
-            <p>Bu teklif 30 gün geçerlidir.</p>
-            <p>${state.settings?.companyPhone || '0555 123 45 67'}</p>
-          </div>
-          
-          <div class="actions" style="text-align: center; margin-top: 20px;">
-            <button onclick="window.print()" style="padding: 10px 20px; background: #2563eb; color: white; border: none; border-radius: 5px; margin: 0 10px;">Yazdır</button>
-            <button onclick="window.close()" style="padding: 10px 20px; background: #dc2626; color: white; border: none; border-radius: 5px; margin: 0 10px;">Kapat</button>
-          </div>
-        </body>
-      </html>
+    const buildingAddress = building?.address ? 
+      `${building.address.mahalle} ${building.address.sokak} ${building.address.binaNo}, ${building.address.ilce}/${building.address.il}` : 
+      'Adres belirtilmemiş';
+
+    const allValues = {
+      COMPANY_NAME: state.settings?.companyName || '',
+      COMPANY_SLOGAN: state.settings?.companySlogan || '', // YENİ EKLENDİ
+      COMPANY_ADDRESS: companyAddress,
+      COMPANY_PHONE: state.settings?.companyPhone || '',
+      LOGO: state.settings?.logo ? `<img src="${state.settings.logo}" alt="Logo" class="logo">` : '',
+      CE_EMBLEM: state.settings?.ceEmblemUrl ? `<img src="${state.settings.ceEmblemUrl}" alt="CE Sertifikası">` : '',
+      TSE_EMBLEM: state.settings?.tseEmblemUrl ? `<img src="${state.settings.tseEmblemUrl}" alt="TSE Sertifikası">` : '',
+      BUILDING_NAME: building?.name || '',
+      BUILDING_RESPONSIBLE: building?.buildingResponsible || '', // YENİ EKLENDİ
+      BUILDING_ADDRESS: buildingAddress,
+      CONTACT_PHONE: building?.contactInfo || '',
+      MONTHLY_MAINTENANCE_FEE: (building?.maintenanceFee * building?.elevatorCount || 0).toLocaleString('tr-TR'),
+      ELEVATOR_COUNT: building?.elevatorCount || '',
+      // Manuel alanlar proposal.fieldValues'tan
+      ...proposal.fieldValues,
+    };
+
+    let htmlContent = template.content;
+
+    // Items tablosunu oluştur ve yer tutucuyu değiştir
+    const itemsTableHtml = `
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th>Açıklama</th>
+            <th>Miktar</th>
+            <th>Birim Fiyat</th>
+            <th>Toplam</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${proposal.items.map((item: any) => `
+            <tr>
+              <td>${item.description}</td>
+              <td>${item.quantity}</td>
+              <td>${item.unitPrice.toLocaleString('tr-TR')} ₺</td>
+              <td>${item.totalPrice.toLocaleString('tr-TR')} ₺</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
     `;
+    htmlContent = htmlContent.replace('{{ITEMS_TABLE}}', itemsTableHtml);
+    htmlContent = htmlContent.replace('{{TOTAL_AMOUNT}}', proposal.totalAmount.toLocaleString('tr-TR') + ' ₺');
+
+
+    return replacePlaceholders(htmlContent, allValues);
   };
 
   const handlePreview = (proposal: any) => {
@@ -282,6 +258,26 @@ const ProposalTypePage: React.FC = () => {
   };
 
   const selectedTemplateData = state.proposalTemplates.find(t => t.id === selectedTemplate);
+
+  const handleBuildingSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedBuildingId = e.target.value;
+    const selectedBuilding = state.buildings.find(b => b.id === selectedBuildingId);
+    
+    setProposalForm(prev => ({
+      ...prev,
+      buildingId: selectedBuildingId,
+      buildingName: selectedBuilding?.name || '',
+      fieldValues: {
+        ...prev.fieldValues,
+        BUILDING_NAME: selectedBuilding?.name || '',
+        BUILDING_RESPONSIBLE: selectedBuilding?.buildingResponsible || '',
+        BUILDING_ADDRESS: selectedBuilding ? getFullAddress(selectedBuilding) : '',
+        CONTACT_PHONE: selectedBuilding?.contactInfo || '',
+        MONTHLY_MAINTENANCE_FEE: (selectedBuilding?.maintenanceFee * selectedBuilding?.elevatorCount || 0).toLocaleString('tr-TR'),
+        ELEVATOR_COUNT: selectedBuilding?.elevatorCount || '',
+      }
+    }));
+  };
 
   return (
     <div className="p-4 md:p-6">
@@ -386,16 +382,21 @@ const ProposalTypePage: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
-                    Bina Adı
+                    Bina Seçin
                   </label>
-                  <input
-                    type="text"
-                    value={proposalForm.buildingName}
-                    onChange={(e) => setProposalForm(prev => ({ ...prev, buildingName: e.target.value }))}
+                  <select
+                    value={proposalForm.buildingId}
+                    onChange={handleBuildingSelect}
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                     required
-                    placeholder="Bina adını girin"
-                  />
+                  >
+                    <option value="">Bina seçin...</option>
+                    {state.buildings.map(building => (
+                      <option key={building.id} value={building.id}>
+                        {building.name} ({getFullAddress(building)})
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 
                 <div>
@@ -463,11 +464,11 @@ const ProposalTypePage: React.FC = () => {
               </div>
 
               {/* Custom Fields */}
-              {selectedTemplateData && selectedTemplateData.fields.length > 0 && (
+              {selectedTemplateData && selectedTemplateData.fillableFields && selectedTemplateData.fillableFields.length > 0 && (
                 <div className="mt-6">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Özel Alanlar</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {selectedTemplateData.fields.map((field) => (
+                    {selectedTemplateData.fillableFields.map((field) => (
                       <div key={field.id}>
                         <label className="block text-sm font-medium text-gray-700">
                           {field.label} {field.required && <span className="text-red-500">*</span>}
