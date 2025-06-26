@@ -10,7 +10,9 @@ import {
   Income,
   User,
   DebtRecord,
+  AppSettings,
   FaultReport,
+  MaintenanceReceipt,
   MaintenanceHistory,
   MaintenanceRecord,
   Printer,
@@ -19,6 +21,7 @@ import {
   Payment,
   ProposalTemplate,
   QRCodeData,
+  NotificationData,
   AutoSaveData,
   ArchivedReceipt,
 } from '../types';
@@ -27,9 +30,12 @@ import {
 const initialState: AppState = {
   buildings: [],
   parts: [
-    { id: 'part-1', name: 'Motor', quantity: 10, price: 1500 },
-    { id: 'part-2', name: 'Halat', quantity: 50, price: 250 },
-    { id: 'part-3', name: 'Kontrol Kartı', quantity: 5, price: 3000 },
+    // Örnek Parçalar - YENİ EKLENDİ
+    { id: uuidv4(), name: 'Motor', quantity: 5, price: 15000 },
+    { id: uuidv4(), name: 'Halat', quantity: 20, price: 500 },
+    { id: uuidv4(), name: 'Kapı Sensörü', quantity: 15, price: 300 },
+    { id: uuidv4(), name: 'Kumanda Kartı', quantity: 8, price: 2500 },
+    { id: uuidv4(), name: 'Fren Balatası', quantity: 30, price: 100 },
   ],
   partInstallations: [],
   manualPartInstallations: [],
@@ -40,74 +46,93 @@ const initialState: AppState = {
   notifications: [],
   sidebarOpen: false,
   settings: {
-    appTitle: 'TKNLİFT',
+    appTitle: 'TKNLİFT', // BURASI GÜNCELLENDİ
     logo: null,
-    companyName: 'Asansör Bakım Servisi',
-    companyPhone: '0555 123 45 67',
-    companyAddress: { mahalle: '', sokak: '', il: '', ilce: '', binaNo: '' },
-    ceEmblemUrl: '/ce.png',
-    tseEmblemUrl: '/ts.jpg',
+    companyName: 'TKNLİFT Asansör',
+    companySlogan: 'Güvenli ve Hızlı Çözümler', // YENİ EKLENDİ
+    companyPhone: '05551234567',
+    companyAddress: {
+      mahalle: 'Merkez Mah.',
+      sokak: 'Ana Cad.',
+      il: 'İstanbul',
+      ilce: 'Kadıköy',
+      binaNo: '123',
+    },
+    ceEmblemUrl: '/ce.png', // public klasöründeki örnek görsel
+    tseEmblemUrl: '/ts.jpg', // public klasöründeki örnek görsel
     receiptTemplate: `
-      <div class="receipt-container">
-        <div class="header-section">
-          <div class="header-left">{{LOGO}}</div>
-          <div class="header-center"><h1 class="company-name-title">{{COMPANY_NAME}}</h1></div>
-          <div class="header-right">{{TSE_EMBLEM}}{{CE_EMBLEM}}</div>
+      <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee; max-width: 600px; margin: auto;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          {{LOGO}}
+          <h1 style="color: #333;">{{COMPANY_NAME}}</h1>
+          <p style="font-size: 12px; color: #777;">{{COMPANY_ADDRESS}}</p>
+          <p style="font-size: 12px; color: #777;">Tel: {{COMPANY_PHONE}}</p>
+          <div style="display: flex; justify-content: center; gap: 10px; margin-top: 10px;">
+            {{CE_EMBLEM}}
+            {{TSE_EMBLEM}}
+          </div>
         </div>
-        <div class="receipt-title-section"><h2>BAKIM - ARIZA SERVİS FORMU</h2></div>
-        <div class="contact-and-date-section">
-          <div class="contact-info"><p>SERVİS NO : {{COMPANY_PHONE}}</p><p>{{COMPANY_ADDRESS}}</p></div>
-          <div class="date-info"><p style="font-weight:bold;font-size:16px;color:#333;">TARİH : {{DATE}}</p></div>
+        <h2 style="text-align: center; color: #555; border-bottom: 1px solid #eee; padding-bottom: 10px;">BAKIM FİŞİ</h2>
+        <div style="margin-bottom: 10px;">
+          <strong>Bina Adı:</strong> {{BUILDING_NAME}}<br>
+          <strong>Adres:</strong> {{BUILDING_ADDRESS}}<br>
+          <strong>Asansör Sayısı:</strong> {{ELEVATOR_COUNT}}<br>
+          <strong>Bakım Ücreti:</strong> {{MAINTENANCE_FEE}} ₺<br>
+          <strong>Teknisyen:</strong> {{TECHNICIAN}}<br>
+          <strong>Tarih:</strong> {{DATE}} {{TIME}}<br>
         </div>
-        <div class="building-details-section"><h3>BİNANIN ADI : {{BUILDING_NAME}}</h3></div>
-        {{MAINTENANCE_NOTE_SECTION}}
-        <div class="note-section"><p>NOT : Bu bakımdan sonra meydana gelebilecek kapı camı kırılması, tavan aydınlatmasının kırılması durumlarında durumu hemen firmamıza bildiriniz. Kırık kapı camı ile asansörü çalıştırmayınız. Aksi taktirde olabilecek durumlardan firmamız sorumlu olmayacaktır.</p></div>
-        <div class="maintenance-summary-section"><h3>YAPILAN İŞLEMLER</h3><div class="summary-item"><span>Bakım Yapıldı</span><span>{{MAINTENANCE_FEE_CALCULATED}}</span></div></div>
+        <div style="margin-bottom: 10px;">
+          <strong>Yapılan İşlem:</strong> {{MAINTENANCE_ACTION}}
+        </div>
         {{PARTS_SECTION}}
-        <div class="total-amount-section"><span>Toplam Tutar:</span><span class="final-total">{{FINAL_TOTAL_AMOUNT}}</span>{{BUILDING_CURRENT_DEBT_SECTION}}</div>
-        <div class="footer-warning-section"><p>! ! ! Asansör bakımı esnasında değiştirilmesi önerilen parçaların apartman yönetimi tarafından parça değişimine onay verilmemesi durumunda doğacak aksaklık ve kazalardan firmamız sorumlu değildir.</p></div>
-        <div class="signature-section"><p>Asansör firma yetkilisi</p><p>{{TECHNICIAN_NAME}}</p></div>
-        <div class="watermark" style="background-image:url('{{LOGO_WATERMARK_URL}}');"></div>
+        {{DEBT_SECTION}}
+        <div style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 10px;">
+          <strong>Notlar:</strong> {{NOTES}}
+        </div>
+        <div style="text-align: right; margin-top: 30px; font-size: 12px; color: #999;">
+          Oluşturulma Zamanı: {{TIMESTAMP}}
+        </div>
       </div>
-      <style>
-        .receipt-container{max-width:800px;margin:0 auto;padding:30px;border:1px solid #eee;box-shadow:0 0 10px rgba(0,0,0,0.1);font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;color:#333;line-height:1.6;background:#fff;overflow:hidden}
-        .watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:80%;height:80%;background-repeat:no-repeat;background-position:center;background-size:contain;opacity:0.25;z-index:0;pointer-events:none}
-        .header-section{display:flex;justify-content:space-between;align-items:center;margin-bottom:30px;border-bottom:2px solid #ccc;padding-bottom:15px;z-index:1}
-        .header-left .logo{max-height:80px;max-width:180px;object-fit:contain}
-        .header-center{text-align:center;flex-grow:1}
-        .company-name-title{font-size:28px;color:#dc2626;margin:0 0 5px 0;font-weight:bold}
-        .header-right{display:flex;gap:15px}
-        .header-right img{max-height:50px;object-fit:contain}
-        .receipt-title-section{text-align:center;background:#dc2626;color:white;padding:10px 0;margin-bottom:25px;z-index:1}
-        .receipt-title-section h2{margin:0;font-size:22px;text-transform:uppercase}
-        .contact-and-date-section{display:flex;justify-content:space-between;margin-bottom:20px;font-size:14px;color:#555;z-index:1}
-        .contact-info p,.date-info p{margin:5px 0}
-        .building-details-section{background:#f8f8f8;padding:15px 20px;margin-bottom:20px;border-left:5px solid #dc2626;z-index:1}
-        .building-details-section h3{margin:0 0 8px 0;color:#333;font-size:19px}
-        .note-section{background:#fffbe6;border:1px solid #ffe58f;padding:15px;margin-bottom:20px;font-size:13px;color:#7a5f00;border-radius:5px;z-index:1}
-        .maintenance-summary-section{margin-bottom:20px;border:1px solid #eee;padding:15px;border-radius:5px;z-index:1}
-        .maintenance-summary-section h3{font-size:18px;font-weight:bold;color:#dc2626;margin-bottom:10px;padding-bottom:5px;border-bottom:1px solid #f0f0f0}
-        .summary-item{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dotted #e0e0e0}
-        .summary-item:last-child{border-bottom:none}
-        .summary-item span:first-child{font-weight:bold;color:#444}
-        .total-amount-section{display:flex;flex-direction:column;justify-content:space-between;align-items:flex-end;background:#f3f4f6;padding:15px 20px;border-top:2px solid #dc2626;margin-top:30px;font-size:20px;font-weight:bold;color:#333;z-index:1}
-        .total-amount-section span:first-child{width:100%;text-align:right;margin-bottom:5px}
-        .final-total{color:#dc2626;font-size:24px}
-        .building-current-debt{width:100%;text-align:right;font-size:16px;color:#555;margin-top:10px}
-        .footer-warning-section{text-align:center;margin-top:30px;padding-top:15px;border-top:1px solid #eee;font-size:13px;color:#777;z-index:1}
-        .footer-warning-section p{margin:0;font-weight:bold;color:#dc2626}
-        .signature-section{text-align:right;margin-top:30px;padding-top:15px;border-top:1px solid #eee;z-index:1}
-        .signature-section p{margin:5px 0;font-weight:bold}
-        @media print{.receipt-container{box-shadow:none;border:none;padding:0}.header-section,.receipt-title-section,.contact-and-date-section,.building-details-section,.note-section,.maintenance-summary-section,.parts-section,.total-amount-section,.footer-warning-section,.signature-section{box-shadow:none;page-break-inside:avoid}.watermark{opacity:0.15}}
-        .parts-section .section-title{font-size:18px;font-weight:bold;color:#dc2626;margin-bottom:10px;padding-bottom:5px;border-bottom:1px solid #f0f0f0}
-        .parts-list{margin:0;padding:0 0 0 20px}
-        .parts-list li{margin:5px 0}
-      </style>
     `,
     installationProposalTemplate: '',
     maintenanceProposalTemplate: '',
     revisionProposalTemplate: '',
-    faultReportTemplate: '',
+    faultReportTemplate: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 20px; background: #f8f9fa; border-bottom: 2px solid #333;">
+          <div style="flex: 1;">
+            {{LOGO}}
+          </div>
+          <div style="flex: 2; text-align: center;">
+            <h1 style="font-size: 24px; font-weight: bold; color: #333; margin: 10px 0;">{{COMPANY_NAME}}</h1>
+            <p style="font-size: 12px; color: #666; font-weight: bold;">Asansör Bakım ve Servis Hizmetleri</p>
+          </div>
+          <div style="flex: 1; text-align: right; font-size: 12px; color: #666;">
+            <p style="margin-bottom: 5px; line-height: 1.4;">{{COMPANY_ADDRESS}}</p>
+            <p style="font-weight: bold;">TEL: {{COMPANY_PHONE}}</p>
+          </div>
+        </div>
+        <div style="text-align: center; padding: 20px; background: #dc2626; color: white;">
+          <h1 style="margin: 0; font-size: 20px;">ARIZA BİLDİRİM FORMU</h1>
+        </div>
+        <div style="padding: 20px; background: #f3f4f6; border-bottom: 1px solid #e5e7eb;">
+          <h2 style="margin: 0 0 10px 0; color: #333; font-size: 18px;">Bina Bilgileri</h2>
+          <p style="margin: 0; color: #666;"><strong>Bina Adı:</strong> {{BUILDING_NAME}}</p>
+          <p style="margin: 0; color: #666;"><strong>Adres:</strong> {{BUILDING_ADDRESS}}</p>
+        </div>
+        <div style="padding: 20px;">
+          <h2 style="margin: 0 0 15px 0; color: #333; font-size: 18px;">Bildirim Detayları</h2>
+          <p style="margin-bottom: 10px;"><strong>Bildiren:</strong> {{REPORTER_NAME}}</p>
+          <p style="margin-bottom: 10px;"><strong>Telefon:</strong> {{REPORTER_PHONE}}</p>
+          <p style="margin-bottom: 10px;"><strong>Daire No:</strong> {{APARTMENT_NO}}</p>
+          <p style="margin-bottom: 10px;"><strong>Açıklama:</strong> {{DESCRIPTION}}</p>
+        </div>
+        <div style="padding: 20px; background: #f8f9fa; border-top: 1px solid #e5e7eb; text-align: center; font-size: 14px; color: #666;">
+          <p>Bu form {{COMPANY_NAME}} tarafından sağlanmıştır.</p>
+          <p>Acil durumlar için lütfen {{COMPANY_PHONE}} numaralı telefonu arayın.</p>
+        </div>
+      </div>
+    `,
     autoSaveInterval: 60,
   },
   lastMaintenanceReset: undefined,
@@ -121,7 +146,131 @@ const initialState: AppState = {
   proposals: [],
   payments: [],
   debtRecords: [],
-  proposalTemplates: [],
+  proposalTemplates: [
+    // Bakım Sözleşmesi Şablonu - YENİ EKLENDİ
+    {
+      id: 'maintenance-contract-template',
+      type: 'maintenance',
+      name: 'Bakım Sözleşmesi',
+      content: `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Bakım Sözleşmesi</title>
+            <style>
+              body { font-family: 'Arial', sans-serif; margin: 0; padding: 20px; font-size: 12px; line-height: 1.5; }
+              .container { max-width: 800px; margin: 0 auto; border: 1px solid #ccc; padding: 30px; }
+              .header { text-align: center; margin-bottom: 30px; }
+              .header img.logo { max-height: 80px; margin-bottom: 10px; }
+              .header h1 { margin: 0; font-size: 24px; color: #333; }
+              .header p { margin: 5px 0; color: #555; }
+              .certifications { display: flex; justify-content: center; gap: 20px; margin-top: 15px; }
+              .certifications img { max-height: 50px; }
+              .section-title { font-weight: bold; margin-top: 20px; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+              .info-row { display: flex; margin-bottom: 5px; }
+              .info-label { font-weight: bold; width: 150px; flex-shrink: 0; }
+              .info-value { flex-grow: 1; }
+              .static-text { margin-top: 20px; margin-bottom: 20px; }
+              .static-text ol, .static-text ul { margin: 0; padding-left: 20px; }
+              .static-text li { margin-bottom: 5px; }
+              .signature-line { margin-top: 50px; text-align: center; }
+              .signature-line div { border-top: 1px solid #000; display: inline-block; padding-top: 5px; min-width: 200px; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                {{LOGO}}
+                <h1>{{COMPANY_NAME}}</h1>
+                <p>{{COMPANY_SLOGAN}}</p>
+                <p>{{COMPANY_ADDRESS}}</p>
+                <p>TEL: {{COMPANY_PHONE}}</p>
+                <div class="certifications">
+                  {{CE_EMBLEM}}
+                  {{TSE_EMBLEM}}
+                </div>
+              </div>
+
+              <h2 style="text-align: center; font-size: 18px; margin-bottom: 30px;">BAKIM SÖZLEŞMESİ</h2>
+
+              <div class="section-title">Sözleşme Bilgileri</div>
+              <div class="info-row"><span class="info-label">Sözleşme Başlangıç Tarihi:</span> <span class="info-value">{{CONTRACT_START_DATE}}</span></div>
+              <div class="info-row"><span class="info-label">Sözleşme Bitiş Tarihi:</span> <span class="info-value">{{CONTRACT_END_DATE}}</span></div>
+
+              <div class="section-title">Bina Bilgileri</div>
+              <div class="info-row"><span class="info-label">Bina Adı:</span> <span class="info-value">{{BUILDING_NAME}}</span></div>
+              <div class="info-row"><span class="info-label">Bina Sorumlusu:</span> <span class="info-value">{{BUILDING_RESPONSIBLE}}</span></div>
+              <div class="info-row"><span class="info-label">Adres:</span> <span class="info-value">{{BUILDING_ADDRESS}}</span></div>
+              <div class="info-row"><span class="info-label">İletişim Telefonu:</span> <span class="info-value">{{CONTACT_PHONE}}</span></div>
+              <div class="info-row"><span class="info-label">Asansör Sayısı:</span> <span class="info-value">{{ELEVATOR_COUNT}}</span></div>
+              <div class="info-row"><span class="info-label">Aylık Bakım Ücreti:</span> <span class="info-value">{{MONTHLY_MAINTENANCE_FEE}} ₺</span></div>
+
+              <div class="section-title">Asansör Detayları</div>
+              <div class="info-row"><span class="info-label">Asansör Cinsi:</span> <span class="info-value">{{ELEVATOR_TYPE}}</span></div>
+              <div class="info-row"><span class="info-label">Taşıyacağı Yük (kg):</span> <span class="info-value">{{LOAD_CAPACITY_KG}}</span></div>
+              <div class="info-row"><span class="info-label">Kat Sayısı:</span> <span class="info-value">{{FLOOR_COUNT}}</span></div>
+              <div class="info-row"><span class="info-label">Durak Sayısı:</span> <span class="info-value">{{STOP_COUNT}}</span></div>
+              <div class="info-row"><span class="info-label">Seyir Mesafesi:</span> <span class="info-value">{{TRAVEL_DISTANCE}}</span></div>
+              <div class="info-row"><span class="info-label">Asansör Hızı (m/s):</span> <span class="info-value">{{ELEVATOR_SPEED_MS}}</span></div>
+
+              <div class="section-title">BAKIMCI FİRMANIN SORUMLULUKLARI</div>
+              <div class="static-text">
+                <ol>
+                  <li>{{COMPANY_NAME}} firması tarafından bahsi geçen asansörün aylık olarak periyodik bakımı yapılacaktır. Lüzumlu hallerde temizleme ve yağlama işlemleri yapılacak, arızaları giderilerek sıhhatli çalışması temin edilecektir.</li>
+                  <li>Bakım işleri, asansör bakım talimatları, standart ve yönetmeliklerine uygun olarak gerçekleştirilecektir.</li>
+                  <li>Bakımı yapan kişi, asansörün çalışmasının veya can güvenliğine engel olacak bir durum tespit ettiğinde durumu Bina Yöneticisine bildirerek gerektiğinde asansörü hizmet dışı bırakabilecektir.</li>
+                  <li>Asansör bildirimlerine en geç şehir içi ise 6 saatte müdahale edilecektir.</li>
+                  <li>Bakımın yapılabilmesi için gerekli yağları, üstübü ve temizlik malzemelerini bina yönetimi temin edecektir.</li>
+                </ol>
+              </div>
+
+              <div class="section-title">BİNA YÖNETİCİSİNİN SORUMLULUKLARI</div>
+              <div class="static-text">
+                <ol>
+                  <li>Asansör makine dairesinin ve asansör kuyusunun başka amaçlar için kullandırmamasını sağlamak.</li>
+                  <li>Kabin, kapı gibi görünen dış yüzeylerin temizletilmesi. Asansör kuyusunun temizliği.</li>
+                  <li>Asansörün kullanım talimatnamesine uygun olarak kullanılmasının sağlanması.</li>
+                  <li>Apartman Yöneticisine firma tarafından teslim edilen, asansörde insan kaldığında kurtarıcı anahtarın muhafazası ve 2. Şahıslara verilmemesi.</li>
+                  <li>Asansörde meydana gelecek arızaların en kısa sürede firmaya bildirilmesi.</li>
+                </ol>
+              </div>
+
+              <div class="section-title">ÖDEME ŞEKLİ</div>
+              <div class="static-text">
+                <ol>
+                  <li>Fiyatlar ait olduğu dönemin sonunda kesilecek ve ödemeler müteakip ayın 15.gününe kadar, firma yetkilisine firmaya ait makbuz mukabili yapılacaktır.</li>
+                  <li>Ödemenin bu süre içinde yapılmaması halinde aylık %10 gecikme farkı talep edilecektir. Asansör müşterisi bu ödeme şeklini peşinen kabul eder.</li>
+                </ol>
+              </div>
+
+              <div class="section-title">ANLAŞMAZLIK</div>
+              <div class="static-text">
+                <ol>
+                  <li>İş bu sözleşmenin tatbikatından doğacak ihtilaflarda BATMAN mahkemeleri ve İcra Daireleri yetkilidir.</li>
+                  <li>İş bu sözleşme 2 nüsha halinde tanzim edilmiştir.</li>
+                </ol>
+              </div>
+
+              <div class="signature-line">
+                <div>{{COMPANY_NAME}}</div>
+              </div>
+            </div>
+          </body>
+        </html>
+      `,
+      fillableFields: [
+        { id: 'contractStartDate', name: 'CONTRACT_START_DATE', label: 'Sözleşme Başlangıç Tarihi', type: 'date', required: true },
+        { id: 'contractEndDate', name: 'CONTRACT_END_DATE', label: 'Sözleşme Bitiş Tarihi', type: 'date', required: true },
+        { id: 'elevatorType', name: 'ELEVATOR_TYPE', label: 'Asansör Cinsi', type: 'text', required: true },
+        { id: 'loadCapacityKg', name: 'LOAD_CAPACITY_KG', label: 'Taşıyacağı Yük (kg)', type: 'number', required: true },
+        { id: 'floorCount', name: 'FLOOR_COUNT', label: 'Binadaki Kat Sayısı', type: 'number', required: true },
+        { id: 'stopCount', name: 'STOP_COUNT', label: 'Durak Sayısı', type: 'number', required: true },
+        { id: 'travelDistance', name: 'TRAVEL_DISTANCE', label: 'Seyir Mesafesi', type: 'number', required: true },
+        { id: 'elevatorSpeedMs', name: 'ELEVATOR_SPEED_MS', label: 'Asansör Hızı (m/s)', type: 'number', required: true },
+      ],
+      documentFile: '',
+    },
+  ],
   qrCodes: [],
   systemNotifications: [],
   autoSaveData: [],
