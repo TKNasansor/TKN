@@ -360,7 +360,6 @@ function appReducer(state: AppState, action: Action): AppState {
 
     case 'TOGGLE_SIDEBAR':
       return { ...state, sidebarOpen: !state.sidebarOpen };
-// ... (önceki kodun devamı)
 
 case 'TOGGLE_MAINTENANCE':
   const { buildingId, showReceipt } = action.payload;
@@ -532,9 +531,6 @@ case 'CANCEL_MAINTENANCE':
       ...state.updates,
     ],
   };
-
-// ... (diğer case'ler devam ediyor)
-    
 
       if (showReceipt) {
         const receiptHtml = generateMaintenanceReceipt(targetBuilding, finalState, state.currentUser?.name || 'Bilinmeyen');
