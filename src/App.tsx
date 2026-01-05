@@ -22,9 +22,9 @@ export default function App() {
       setWeather(null);
 
       // 1) geocode using Nominatim (OpenStreetMap)
+      // Note: Browsers disallow setting the User-Agent header. Use the email query param and limit instead.
       const geocodeRes = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryText)}`,
-        { headers: { 'User-Agent': 'TKN-weather-dashboard/1.0 (email@example.com)' } }
+        `https://nominatim.openstreetmap.org/search?format=json&limit=1&email=youremail@example.com&q=${encodeURIComponent(queryText)}`
       );
       const geocodeJson: GeocodeResult[] = await geocodeRes.json();
       if (!geocodeJson || geocodeJson.length === 0) {
